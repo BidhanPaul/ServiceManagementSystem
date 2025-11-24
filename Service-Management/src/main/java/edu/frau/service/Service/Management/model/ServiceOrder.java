@@ -24,8 +24,11 @@ public class ServiceOrder {
     private String supplierRepresentative;
     private String specialistName;
 
-    @Enumerated(EnumType.STRING)
-    private Role role;
+    /**
+     * CHANGED FROM ENUM → STRING
+     * More flexible because role may come from external APIs.
+     */
+    private String role;
 
     private int manDays;
 
@@ -36,7 +39,7 @@ public class ServiceOrder {
 
     public ServiceOrder(Long id, String title, ServiceRequest serviceRequestReference, LocalDate startDate, LocalDate endDate,
                         String location, String supplierName, String supplierRepresentative, String specialistName,
-                        Role role, int manDays) {
+                        String role, int manDays) {
         this.id = id;
         this.title = title;
         this.serviceRequestReference = serviceRequestReference;
@@ -83,13 +86,12 @@ public class ServiceOrder {
     public String getSpecialistName() { return specialistName; }
     public void setSpecialistName(String specialistName) { this.specialistName = specialistName; }
 
-    public Role getRole() { return role; }
-    public void setRole(Role role) { this.role = role; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
     public int getManDays() { return manDays; }
     public void setManDays(int manDays) { this.manDays = manDays; }
 
     public double getContractValue() { return contractValue; }
     public void setContractValue(double contractValue) { this.contractValue = contractValue; }
-
 }

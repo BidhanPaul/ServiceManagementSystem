@@ -2,7 +2,7 @@ package edu.frau.service.Service.Management.repository;
 
 import java.util.List;
 
-import edu.frau.service.Service.Management.model.Role;
+import edu.frau.service.Service.Management.model.RequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import edu.frau.service.Service.Management.model.ServiceRequest;
@@ -11,10 +11,11 @@ import edu.frau.service.Service.Management.model.ServiceRequest;
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, Long> {
 
     // Find all requests created by a specific user
-    List<ServiceRequest> findByRequestedBy_Username(String username);
+    List<ServiceRequest> findByRequestedByUsername(String username);
 
     // Optional additional methods
-    List<ServiceRequest> findByStatus(String status);
-    List<ServiceRequest> findByProjectReferenceId(Long projectId);
-    List<ServiceRequest> findByRole(Role role);
+    List<ServiceRequest> findByStatus(RequestStatus status);
+
+    // If you ever need by project
+    List<ServiceRequest> findByProjectId(String projectId);
 }

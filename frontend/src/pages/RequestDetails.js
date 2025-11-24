@@ -1,4 +1,3 @@
-// src/pages/RequestDetails.js
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Sidebar from "../layout/Sidebar";
@@ -83,14 +82,49 @@ export default function RequestDetails() {
           {request.title}
         </h1>
 
-        <div className="bg-white/80 rounded-2xl shadow-lg p-4 mb-6 text-sm">
+        {/* Request info */}
+        <div className="bg-white/80 rounded-2xl shadow-lg p-4 mb-6 text-sm space-y-1">
           <p><span className="font-semibold">Status:</span> {request.status}</p>
           <p><span className="font-semibold">Type:</span> {request.type}</p>
-          <p><span className="font-semibold">Project:</span> {request.projectReference}</p>
-          <p><span className="font-semibold">Contract:</span> {request.contractReference}</p>
-          <p><span className="font-semibold">Dates:</span> {request.startDate} → {request.endDate}</p>
+          <p><span className="font-semibold">Project ID:</span> {request.projectId || "-"}</p>
+          <p><span className="font-semibold">Contract ID:</span> {request.contractId || "-"}</p>
+          <p>
+            <span className="font-semibold">Dates:</span>{" "}
+            {request.startDate || "-"} → {request.endDate || "-"}
+          </p>
+          <p><span className="font-semibold">Domain:</span> {request.domain || "-"}</p>
+          <p><span className="font-semibold">Role:</span> {request.roleName || "-"}</p>
+          <p><span className="font-semibold">Technology:</span> {request.technology || "-"}</p>
+          <p><span className="font-semibold">Experience:</span> {request.experienceLevel || "-"}</p>
+          <p>
+            <span className="font-semibold">Man days / Onsite:</span>{" "}
+            {request.sumOfManDays || 0} / {request.onsiteDays || 0}
+          </p>
+          <p>
+            <span className="font-semibold">Location:</span>{" "}
+            {request.performanceLocation || "-"}
+          </p>
+          <p>
+            <span className="font-semibold">Must-have:</span>{" "}
+            {(request.mustHaveCriteria || []).join(", ") || "-"}
+          </p>
+          <p>
+            <span className="font-semibold">Nice-to-have:</span>{" "}
+            {(request.niceToHaveCriteria || []).join(", ") || "-"}
+          </p>
+          {request.taskDescription && (
+            <p>
+              <span className="font-semibold">Task:</span> {request.taskDescription}
+            </p>
+          )}
+          {request.furtherInformation && (
+            <p>
+              <span className="font-semibold">Further info:</span> {request.furtherInformation}
+            </p>
+          )}
         </div>
 
+        {/* Offers */}
         <h2 className="text-xl font-semibold text-white mb-3">Offers</h2>
 
         <div className="bg-white/80 rounded-2xl shadow-lg p-4 space-y-4 text-sm">

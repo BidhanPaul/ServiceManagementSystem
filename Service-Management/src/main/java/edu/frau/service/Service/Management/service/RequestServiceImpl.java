@@ -6,10 +6,10 @@ import edu.frau.service.Service.Management.repository.ServiceOrderRepository;
 import edu.frau.service.Service.Management.repository.ServiceRequestRepository;
 import edu.frau.service.Service.Management.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,37 +31,56 @@ public class RequestServiceImpl implements RequestService {
     @Autowired
     private UserRepository userRepository;
 
-    @Override
-    public ServiceRequest createRequest(ServiceRequest request) {
+    // ---------- helpers ----------
 
-        String user = SecurityContextHolder.getContext().getAuthentication().getName();
-        request.setRequestedByUsername(user);
-
-        if (request.getStatus() == null)
-            request.setStatus(RequestStatus.DRAFT);
-
-        switch (request.getType()) {
-            case SINGLE:
-                request.setMaxOffers(1);
-                request.setMaxAcceptedOffers(1);
-                break;
-
-            case MULTI:
-                if (request.getMaxOffers() == null)
-                    throw new IllegalArgumentException("Max offers must be provided for MULTI request");
-                if (request.getMaxAcceptedOffers() == null)
-                    request.setMaxAcceptedOffers(request.getMaxOffers());
-                break;
-
-            case TEAM:
-                // Later when adding team logic
-                break;
+    private String getCurrentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException("No authenticated user");
         }
-
-        return requestRepository.save(request);
+        return auth.getName();
     }
 
+    private User getCurrentUser() {
+        String username = getCurrentUsername();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+    }
 
+    // ---------- CRUD + workflow ----------
+
+    @Override
+    public ServiceRequest createRequest(ServiceRequest request) {
+        User current = getCurrentUser();
+        if (current.getRole() != Role.PROJECT_MANAGER) {
+            throw new RuntimeException("Only PROJECT_MANAGER can create service requests");
+        }
+
+        // store creator
+        request.setRequestedByUsername(current.getUsername());
+
+        // default status
+        if (request.getStatus() == null) {
+            request.setStatus(RequestStatus.DRAFT);
+        }
+
+        // sane defaults for offers
+        if (request.getMaxOffers() == null) {
+            request.setMaxOffers(1);
+        }
+        if (request.getMaxAcceptedOffers() == null) {
+            request.setMaxAcceptedOffers(1);
+        }
+
+        ServiceRequest saved = requestRepository.save(request);
+
+        notificationService.sendToRole(
+                Role.PROCUREMENT_OFFICER,
+                "New draft service request created: " + saved.getTitle()
+        );
+
+        return saved;
+    }
 
     @Override
     public Optional<ServiceRequest> getRequestById(Long id) {
@@ -76,28 +95,41 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public Optional<ServiceRequest> updateRequest(Long id, ServiceRequest updated) {
         return requestRepository.findById(id).map(existing -> {
+            if (existing.getStatus() != RequestStatus.DRAFT) {
+                throw new RuntimeException("Only DRAFT requests can be edited");
+            }
+
             existing.setTitle(updated.getTitle());
             existing.setType(updated.getType());
-            existing.setProjectReference(updated.getProjectReference());
-            existing.setContractReferences(updated.getContractReferences());
+            existing.setProjectId(updated.getProjectId());
+            existing.setProjectName(updated.getProjectName());
+            existing.setContractId(updated.getContractId());
+            existing.setContractSupplier(updated.getContractSupplier());
             existing.setStartDate(updated.getStartDate());
             existing.setEndDate(updated.getEndDate());
-            existing.setTaskDescription(updated.getTaskDescription());
-            existing.setDomain(updated.getDomain());
-            existing.setRoleName(updated.getRoleName());
-            existing.setTechnology(updated.getTechnology());
-            existing.setExperienceLevel(updated.getExperienceLevel());
             existing.setPerformanceLocation(updated.getPerformanceLocation());
-            existing.setSumOfManDays(updated.getSumOfManDays());
-            existing.setOnsiteDays(updated.getOnsiteDays());
-            // keep status as is unless you want to allow changes
+            existing.setMaxOffers(updated.getMaxOffers());
+            existing.setMaxAcceptedOffers(updated.getMaxAcceptedOffers());
+            existing.setRequiredLanguages(updated.getRequiredLanguages());
+            existing.setMustHaveCriteria(updated.getMustHaveCriteria());
+            existing.setNiceToHaveCriteria(updated.getNiceToHaveCriteria());
+            existing.setTaskDescription(updated.getTaskDescription());
+            existing.setFurtherInformation(updated.getFurtherInformation());
+            existing.setRoles(updated.getRoles());
+
             return requestRepository.save(existing);
         });
     }
 
     @Override
     public boolean deleteRequest(Long id) {
-        if (!requestRepository.existsById(id)) return false;
+        Optional<ServiceRequest> opt = requestRepository.findById(id);
+        if (opt.isEmpty()) return false;
+
+        ServiceRequest req = opt.get();
+        if (req.getStatus() != RequestStatus.DRAFT) {
+            throw new RuntimeException("Only DRAFT requests can be deleted");
+        }
         requestRepository.deleteById(id);
         return true;
     }
@@ -110,8 +142,10 @@ public class RequestServiceImpl implements RequestService {
         req.setStatus(RequestStatus.IN_REVIEW);
         ServiceRequest saved = requestRepository.save(req);
 
-        notificationService.sendToRole(Role.PROCUREMENT_OFFICER,
-                "Service request in review: " + saved.getTitle());
+        notificationService.sendToRole(
+                Role.PROCUREMENT_OFFICER,
+                "Service request in review: " + saved.getTitle()
+        );
 
         return saved;
     }
@@ -124,11 +158,14 @@ public class RequestServiceImpl implements RequestService {
         req.setStatus(RequestStatus.APPROVED_FOR_BIDDING);
         ServiceRequest saved = requestRepository.save(req);
 
-        // notify project manager & resource planner
-        notificationService.sendToUsername(req.getRequestedByUsername(),
-                "Your request has been approved for bidding: " + req.getTitle());
-        notificationService.sendToRole(Role.RESOURCE_PLANNER,
-                "Request approved for bidding: " + req.getTitle());
+        notificationService.sendToUsername(
+                req.getRequestedByUsername(),
+                "Your request has been approved for bidding: " + req.getTitle()
+        );
+        notificationService.sendToRole(
+                Role.RESOURCE_PLANNER,
+                "Request approved for bidding: " + req.getTitle()
+        );
 
         return saved;
     }
@@ -141,8 +178,10 @@ public class RequestServiceImpl implements RequestService {
         req.setStatus(RequestStatus.REJECTED);
         ServiceRequest saved = requestRepository.save(req);
 
-        notificationService.sendToUsername(req.getRequestedByUsername(),
-                "Request rejected: " + req.getTitle() + " – " + reason);
+        notificationService.sendToUsername(
+                req.getRequestedByUsername(),
+                "Request rejected: " + req.getTitle() + " – " + reason
+        );
 
         return saved;
     }
@@ -156,17 +195,19 @@ public class RequestServiceImpl implements RequestService {
 
         ServiceOffer saved = offerRepository.save(offer);
 
-        // put request into bidding / evaluation phase if needed
         if (request.getStatus() == RequestStatus.APPROVED_FOR_BIDDING) {
             request.setStatus(RequestStatus.BIDDING);
             requestRepository.save(request);
         }
 
-        // notify PM + resource planner
-        notificationService.sendToUsername(request.getRequestedByUsername(),
-                "New offer received for request: " + request.getTitle());
-        notificationService.sendToRole(Role.RESOURCE_PLANNER,
-                "New offer received for request: " + request.getTitle());
+        notificationService.sendToUsername(
+                request.getRequestedByUsername(),
+                "New offer received for request: " + request.getTitle()
+        );
+        notificationService.sendToRole(
+                Role.RESOURCE_PLANNER,
+                "New offer received for request: " + request.getTitle()
+        );
 
         return saved;
     }
@@ -184,14 +225,18 @@ public class RequestServiceImpl implements RequestService {
         ServiceOffer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new IllegalArgumentException("Offer not found"));
 
-        req.setPreferredOfferId(offer.getId()); // make sure this field exists in ServiceRequest
+        req.setPreferredOfferId(offer.getId());
         req.setStatus(RequestStatus.EVALUATION);
         ServiceRequest saved = requestRepository.save(req);
 
-        notificationService.sendToUsername(req.getRequestedByUsername(),
-                "Preferred offer selected for request: " + req.getTitle());
-        notificationService.sendToRole(Role.RESOURCE_PLANNER,
-                "Preferred offer selected for request: " + req.getTitle());
+        notificationService.sendToUsername(
+                req.getRequestedByUsername(),
+                "Preferred offer selected for request: " + req.getTitle()
+        );
+        notificationService.sendToRole(
+                Role.RESOURCE_PLANNER,
+                "Preferred offer selected for request: " + req.getTitle()
+        );
 
         return saved;
     }
@@ -208,12 +253,27 @@ public class RequestServiceImpl implements RequestService {
         order.setServiceRequestReference(req);
         order.setStartDate(req.getStartDate());
         order.setEndDate(req.getEndDate());
-        order.setLocation(req.getDomain()); // or correct field
+        order.setLocation(req.getPerformanceLocation());
         order.setSupplierName(offer.getSupplierName());
         order.setSupplierRepresentative(offer.getSupplierRepresentative());
         order.setSpecialistName(offer.getSpecialistName());
-        order.setRole(req.getRole());
-        order.setManDays(req.getSumOfManDays());
+
+        // role = first requested role name, if any
+        String roleName = null;
+        if (req.getRoles() != null && !req.getRoles().isEmpty()) {
+            roleName = req.getRoles().get(0).getRoleName();
+        }
+        order.setRole(roleName);
+
+        // total man days = sum of all roles
+        int totalManDays = 0;
+        if (req.getRoles() != null) {
+            totalManDays = req.getRoles().stream()
+                    .map(r -> r.getManDays() != null ? r.getManDays() : 0)
+                    .reduce(0, Integer::sum);
+        }
+        order.setManDays(totalManDays);
+
         order.setContractValue(offer.getTotalCost());
 
         ServiceOrder savedOrder = orderRepository.save(order);
@@ -222,11 +282,10 @@ public class RequestServiceImpl implements RequestService {
         requestRepository.save(req);
 
         notificationService.sendToUsername(
-                req.getRequestedBy().getUsername(),
+                req.getRequestedByUsername(),
                 "Service order created for request: " + req.getTitle()
         );
 
         return savedOrder;
     }
-
 }

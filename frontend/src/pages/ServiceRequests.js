@@ -10,34 +10,24 @@ export default function ServiceRequests() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Full form state (frontend-only structure)
+  // Reference data from mockapi.io
+  const [projects, setProjects] = useState([]);
+  const [contracts, setContracts] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedContract, setSelectedContract] = useState(null);
+  const [availableRoles, setAvailableRoles] = useState([]); // contract.roles
+
   const [form, setForm] = useState({
     title: "",
     type: "SINGLE",
-
-    // References (for future Group 1 & 2 integration)
     projectId: "",
     contractId: "",
-
-    // Dates
     startDate: "",
     endDate: "",
-
-    // Core request attributes
-    domain: "",
-    roleName: "",
-    technology: "",
-    experienceLevel: "",
     performanceLocation: "",
-    sumOfManDays: "",
-    onsiteDays: "",
-
-    // Offer limits
     maxOffers: "",
     maxAcceptedOffers: "",
-
-    // Criteria / languages
-    requiredLanguagesInput: "", // comma separated
+    requiredLanguagesInput: "",
     must1: "",
     must2: "",
     must3: "",
@@ -46,11 +36,24 @@ export default function ServiceRequests() {
     nice3: "",
     nice4: "",
     nice5: "",
-
-    // Description
     taskDescription: "",
     furtherInformation: "",
   });
+
+  // dynamic roles array – used for SINGLE / MULTI / TEAM / WORK_CONTRACT
+  const emptyRoleRow = () => ({
+    selectedContractRole: "", // name from contract.roles[x].role
+    domain: "",
+    roleName: "",
+    technology: "",
+    experienceLevel: "",
+    manDays: "",
+    onsiteDays: "",
+  });
+
+  const [roles, setRoles] = useState([emptyRoleRow()]);
+
+  // ------------ LOAD DATA ------------
 
   const loadRequests = async () => {
     try {
@@ -63,53 +66,164 @@ export default function ServiceRequests() {
     }
   };
 
+  const loadProjectsFromMock = async () => {
+    try {
+      const res = await fetch(
+        "https://69233a5309df4a492324c022.mockapi.io/Projects"
+      );
+      const data = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load projects from mockapi", err);
+    }
+  };
+
+  const loadContractsFromMock = async () => {
+    try {
+      const res = await fetch(
+        "https://69233a5309df4a492324c022.mockapi.io/Contracts"
+      );
+      const data = await res.json();
+      setContracts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load contracts from mockapi", err);
+    }
+  };
+
   useEffect(() => {
     loadRequests();
+    loadProjectsFromMock();
+    loadContractsFromMock();
   }, []);
+
+  // ------------ HANDLERS ------------
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // handle type specially (SINGLE = only 1 role row)
+    if (name === "type") {
+      const newType = value;
+      setForm((prev) => ({ ...prev, type: newType }));
+      setRoles((prev) => {
+        if (newType === "SINGLE" && prev.length > 1) {
+          return [prev[0]]; // keep first row only
+        }
+        return prev;
+      });
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const handleProjectSelect = (e) => {
+    const projectId = e.target.value;
+    const proj = projects.find((p) => p.id === projectId) || null;
+    setSelectedProject(proj);
+
+    setForm((prev) => {
+      const updated = { ...prev, projectId };
+
+      if (proj) {
+        // auto-fill only if still empty → user can override
+        if (!updated.title) {
+          updated.title = proj.name;
+        }
+        if (!updated.startDate && proj.startDate) {
+          updated.startDate = proj.startDate;
+        }
+        if (!updated.endDate && proj.endDate) {
+          updated.endDate = proj.endDate;
+        }
+        if (!updated.taskDescription && proj.description) {
+          updated.taskDescription = proj.description;
+        }
+        if (!updated.furtherInformation && proj.department) {
+          updated.furtherInformation = proj.department;
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleContractSelect = (e) => {
+    const contractId = e.target.value;
+    const contract = contracts.find((c) => c.id === contractId) || null;
+    setSelectedContract(contract);
+    setAvailableRoles(contract?.roles || []);
+
+    setForm((prev) => ({ ...prev, contractId }));
+
+    // we do NOT auto-fill rows yet – user chooses which contract role per row
+  };
+
+  const handleRoleFieldChange = (index, field, value) => {
+    setRoles((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleRoleContractSelect = (index, roleName) => {
+    setRoles((prev) => {
+      const copy = [...prev];
+      const row = { ...copy[index], selectedContractRole: roleName };
+
+      if (selectedContract && availableRoles.length > 0) {
+        const contractRole = availableRoles.find((r) => r.role === roleName);
+        if (contractRole) {
+          row.roleName = contractRole.role;
+          row.experienceLevel = contractRole.experience;
+          row.domain = selectedContract.domain;
+          // technology stays manual, user can type if needed
+        }
+      }
+
+      copy[index] = row;
+      return copy;
+    });
+  };
+
+  const addRoleRow = () => {
+    if (form.type === "SINGLE" && roles.length >= 1) return;
+    setRoles((prev) => [...prev, emptyRoleRow()]);
+  };
+
+  const removeRoleRow = (index) => {
+    if (roles.length === 1) return; // keep at least one row
+    setRoles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const numOrNull = (v) =>
+    v === null || v === undefined || v === "" ? null : Number(v);
 
   const createRequest = async (e) => {
     e.preventDefault();
 
-    // Build payload that matches your ServiceRequest entity
+    // Build payload that matches current ServiceRequest + RequestedRole
     const payload = {
       title: form.title,
-      type: form.type, // "SINGLE", "MULTI", "TEAM", "WORK_CONTRACT"
+      type: form.type, // SINGLE / MULTI / TEAM / WORK_CONTRACT
+
+      // backend uses List<String> projectIds / contractIds
+      projectIds: form.projectId ? [form.projectId] : [],
+      contractIds: form.contractId ? [form.contractId] : [],
+
       startDate: form.startDate || null,
       endDate: form.endDate || null,
-      domain: form.domain || null,
-      roleName: form.roleName || null,
-      technology: form.technology || null,
-      experienceLevel: form.experienceLevel || null,
       performanceLocation: form.performanceLocation || null,
+
+      maxOffers: numOrNull(form.maxOffers),
+      maxAcceptedOffers: numOrNull(form.maxAcceptedOffers),
+
       taskDescription: form.taskDescription || null,
       furtherInformation: form.furtherInformation || null,
     };
 
-    // Numbers (convert "" → null, otherwise Number)
-    const numOrNull = (v) =>
-      v === null || v === undefined || v === "" ? null : Number(v);
-
-    payload.sumOfManDays = numOrNull(form.sumOfManDays);
-    payload.onsiteDays = numOrNull(form.onsiteDays);
-    payload.maxOffers = numOrNull(form.maxOffers);
-    payload.maxAcceptedOffers = numOrNull(form.maxAcceptedOffers);
-
-    // Project reference (Group 1 – later this will be selected from API)
-    if (form.projectId) {
-      payload.projectReference = { id: Number(form.projectId) };
-    }
-
-    // Contract references (Group 2 – for now: one contract)
-    if (form.contractId) {
-      payload.contractReferences = [{ id: Number(form.contractId) }];
-    }
-
-    // Required languages: comma-separated → array
+    // languages
     if (form.requiredLanguagesInput.trim() !== "") {
       payload.requiredLanguages = form.requiredLanguagesInput
         .split(",")
@@ -117,23 +231,35 @@ export default function ServiceRequests() {
         .filter(Boolean);
     }
 
-    // Must-have criteria (max 3)
-    payload.mustHaveCriteria = [form.must1, form.must2, form.must3].filter(
-      (s) => s && s.trim() !== ""
-    );
+    // must-have / nice-to-have
+    payload.mustHaveCriteria = [form.must1, form.must2, form.must3]
+      .map((s) => (s ? s.trim() : ""))
+      .filter((s) => s !== "");
 
-    // Nice-to-have criteria (max 5)
     payload.niceToHaveCriteria = [
       form.nice1,
       form.nice2,
       form.nice3,
       form.nice4,
       form.nice5,
-    ].filter((s) => s && s.trim() !== "");
+    ]
+      .map((s) => (s ? s.trim() : ""))
+      .filter((s) => s !== "");
+
+    // roles from dynamic table
+    payload.roles = roles.map((r) => ({
+      domain: r.domain || null,
+      roleName: r.roleName || null,
+      technology: r.technology || null,
+      experienceLevel: r.experienceLevel || null,
+      manDays: numOrNull(r.manDays),
+      onsiteDays: numOrNull(r.onsiteDays),
+    }));
 
     try {
       await API.post("/requests", payload);
-      // Reset form
+
+      // reset form + roles
       setForm({
         title: "",
         type: "SINGLE",
@@ -141,13 +267,7 @@ export default function ServiceRequests() {
         contractId: "",
         startDate: "",
         endDate: "",
-        domain: "",
-        roleName: "",
-        technology: "",
-        experienceLevel: "",
         performanceLocation: "",
-        sumOfManDays: "",
-        onsiteDays: "",
         maxOffers: "",
         maxAcceptedOffers: "",
         requiredLanguagesInput: "",
@@ -162,6 +282,11 @@ export default function ServiceRequests() {
         taskDescription: "",
         furtherInformation: "",
       });
+      setSelectedProject(null);
+      setSelectedContract(null);
+      setAvailableRoles([]);
+      setRoles([emptyRoleRow()]);
+
       loadRequests();
     } catch (err) {
       console.error("Failed to create request", err);
@@ -177,6 +302,53 @@ export default function ServiceRequests() {
       console.error("Failed to submit for review", err);
     }
   };
+
+  const deleteRequest = async (id) => {
+    if (!window.confirm("Delete this draft request?")) return;
+    try {
+      await API.delete(`/requests/${id}`);
+      loadRequests();
+    } catch (err) {
+      console.error("Failed to delete request", err);
+    }
+  };
+
+  const statusBadgeClass = (status) => {
+    switch (status) {
+      case "DRAFT":
+        return "bg-gray-200 text-gray-700";
+      case "IN_REVIEW":
+        return "bg-yellow-100 text-yellow-800";
+      case "APPROVED_FOR_BIDDING":
+        return "bg-blue-100 text-blue-800";
+      case "BIDDING":
+        return "bg-purple-100 text-purple-800";
+      case "ORDERED":
+        return "bg-emerald-100 text-emerald-800";
+      case "REJECTED":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const projectLabel = (req) => {
+    if (!req.projectIds || req.projectIds.length === 0) return "-";
+    const id = req.projectIds[0];
+    const proj = projects.find((p) => p.id === id);
+    if (!proj) return id;
+    return `${proj.customer} – ${proj.name}`;
+  };
+
+  const contractLabel = (req) => {
+    if (!req.contractIds || req.contractIds.length === 0) return "-";
+    const id = req.contractIds[0];
+    const c = contracts.find((x) => x.id === id);
+    if (!c) return id;
+    return `${c.supplier} – ${c.domain}`;
+  };
+
+  // ------------ RENDER ------------
 
   return (
     <div className="flex">
@@ -233,28 +405,42 @@ export default function ServiceRequests() {
           <div className="grid gap-4 md:grid-cols-4">
             <div>
               <label className="block text-xs text-gray-600 mb-1">
-                Project ID (from Group 1)
+                Project (from Group 1 / MockAPI)
               </label>
-              <input
-                type="number"
+              <select
                 name="projectId"
                 value={form.projectId}
-                onChange={handleChange}
+                onChange={handleProjectSelect}
                 className="w-full border rounded-lg px-3 py-2"
-              />
+              >
+                <option value="">-- Select project --</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.customer} – {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
             <div>
               <label className="block text-xs text-gray-600 mb-1">
-                Contract ID (from Group 2)
+                Contract (from Group 2 / MockAPI)
               </label>
-              <input
-                type="number"
+              <select
                 name="contractId"
                 value={form.contractId}
-                onChange={handleChange}
+                onChange={handleContractSelect}
                 className="w-full border rounded-lg px-3 py-2"
-              />
+              >
+                <option value="">-- Select contract --</option>
+                {contracts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.supplier} – {c.domain}
+                  </option>
+                ))}
+              </select>
             </div>
+
             <div>
               <label className="block text-xs text-gray-600 mb-1">
                 Start Date
@@ -281,88 +467,122 @@ export default function ServiceRequests() {
             </div>
           </div>
 
-          {/* Domain / Role / Tech / Experience */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Domain
-              </label>
-              <input
-                type="text"
-                name="domain"
-                value={form.domain}
-                onChange={handleChange}
-                placeholder="e.g. Consulting and Development"
-                className="w-full border rounded-lg px-3 py-2"
-              />
+          {/* Dynamic roles */}
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-sm font-semibold text-gray-700">
+                Requested Roles
+              </h2>
+              <button
+                type="button"
+                onClick={addRoleRow}
+                className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+              >
+                + Add Role
+              </button>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Role Name
-              </label>
-              <input
-                type="text"
-                name="roleName"
-                value={form.roleName}
-                onChange={handleChange}
-                placeholder="e.g. Project Manager"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Technology
-              </label>
-              <input
-                type="text"
-                name="technology"
-                value={form.technology}
-                onChange={handleChange}
-                placeholder="e.g. Java, Spring Boot"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Experience Level
-              </label>
-              <input
-                type="text"
-                name="experienceLevel"
-                value={form.experienceLevel}
-                onChange={handleChange}
-                placeholder="e.g. Senior"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
+
+            {roles.map((r, index) => (
+              <div
+                key={index}
+                className="grid gap-2 md:grid-cols-7 mb-2 items-center"
+              >
+                {/* Contract role dropdown */}
+                <select
+                  value={r.selectedContractRole}
+                  onChange={(e) =>
+                    handleRoleContractSelect(index, e.target.value)
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                  disabled={!selectedContract || availableRoles.length === 0}
+                >
+                  <option value="">
+                    {selectedContract
+                      ? "-- Select role from contract --"
+                      : "Select contract first"}
+                  </option>
+                  {availableRoles.map((cr) => (
+                    <option key={cr.role} value={cr.role}>
+                      {cr.role} ({cr.experience})
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  placeholder="Domain"
+                  value={r.domain}
+                  onChange={(e) =>
+                    handleRoleFieldChange(index, "domain", e.target.value)
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Role name"
+                  value={r.roleName}
+                  onChange={(e) =>
+                    handleRoleFieldChange(index, "roleName", e.target.value)
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Technology"
+                  value={r.technology}
+                  onChange={(e) =>
+                    handleRoleFieldChange(index, "technology", e.target.value)
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Experience"
+                  value={r.experienceLevel}
+                  onChange={(e) =>
+                    handleRoleFieldChange(
+                      index,
+                      "experienceLevel",
+                      e.target.value
+                    )
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Man days"
+                  value={r.manDays}
+                  onChange={(e) =>
+                    handleRoleFieldChange(index, "manDays", e.target.value)
+                  }
+                  className="border rounded-lg px-2 py-1 text-sm"
+                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    placeholder="Onsite days"
+                    value={r.onsiteDays}
+                    onChange={(e) =>
+                      handleRoleFieldChange(index, "onsiteDays", e.target.value)
+                    }
+                    className="border rounded-lg px-2 py-1 text-sm flex-1"
+                  />
+                  {roles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRoleRow(index)}
+                      className="text-xs text-red-500"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Man days / Location / Offer limits */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Sum of Man Days
-              </label>
-              <input
-                type="number"
-                name="sumOfManDays"
-                value={form.sumOfManDays}
-                onChange={handleChange}
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Onsite Days
-              </label>
-              <input
-                type="number"
-                name="onsiteDays"
-                value={form.onsiteDays}
-                onChange={handleChange}
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
+          {/* Location + offer limits */}
+          <div className="grid gap-4 md:grid-cols-3 mt-4">
             <div>
               <label className="block text-xs text-gray-600 mb-1">
                 Performance Location
@@ -376,31 +596,29 @@ export default function ServiceRequests() {
                 className="w-full border rounded-lg px-3 py-2"
               />
             </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Max Offers
-                </label>
-                <input
-                  type="number"
-                  name="maxOffers"
-                  value={form.maxOffers}
-                  onChange={handleChange}
-                  className="w-full border rounded-lg px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Max Accepted
-                </label>
-                <input
-                  type="number"
-                  name="maxAcceptedOffers"
-                  value={form.maxAcceptedOffers}
-                  onChange={handleChange}
-                  className="w-full border rounded-lg px-3 py-2"
-                />
-              </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                Max Offers
+              </label>
+              <input
+                type="number"
+                name="maxOffers"
+                value={form.maxOffers}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                Max Accepted Offers
+              </label>
+              <input
+                type="number"
+                name="maxAcceptedOffers"
+                value={form.maxAcceptedOffers}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-3 py-2"
+              />
             </div>
           </div>
 
@@ -548,8 +766,9 @@ export default function ServiceRequests() {
                   <th className="py-2">Title</th>
                   <th className="py-2">Type</th>
                   <th className="py-2">Status</th>
-                  <th className="py-2">Project ID</th>
-                  <th className="py-2">Contract ID</th>
+                  <th className="py-2">Project</th>
+                  <th className="py-2">Contract</th>
+                  <th className="py-2">#Roles</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -558,16 +777,20 @@ export default function ServiceRequests() {
                   <tr key={r.id} className="border-b last:border-0">
                     <td className="py-2">{r.title}</td>
                     <td className="py-2">{r.type}</td>
-                    <td className="py-2">{r.status}</td>
                     <td className="py-2">
-                      {r.projectReference ? r.projectReference.id : "-"}
+                      <span
+                        className={
+                          "inline-flex px-2 py-0.5 rounded-full text-xs font-medium " +
+                          statusBadgeClass(r.status)
+                        }
+                      >
+                        {r.status}
+                      </span>
                     </td>
-                    <td className="py-2">
-                      {r.contractReferences && r.contractReferences.length > 0
-                        ? r.contractReferences.map((c) => c.id).join(", ")
-                        : "-"}
-                    </td>
-                    <td className="py-2 text-right space-x-2">
+                    <td className="py-2">{projectLabel(r)}</td>
+                    <td className="py-2">{contractLabel(r)}</td>
+                    <td className="py-2">{r.roles ? r.roles.length : 0}</td>
+                    <td className="py-2 text-right space-x-3">
                       <button
                         onClick={() => navigate(`/requests/${r.id}`)}
                         className="text-blue-600 hover:underline"
@@ -575,12 +798,21 @@ export default function ServiceRequests() {
                         Details
                       </button>
                       {r.status === "DRAFT" && (
-                        <button
-                          onClick={() => submitForReview(r.id)}
-                          className="text-green-600 hover:underline"
-                        >
-                          Submit
-                        </button>
+                        <>
+                          {/* Edit page can be implemented later */}
+                          <button
+                            onClick={() => deleteRequest(r.id)}
+                            className="text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => submitForReview(r.id)}
+                            className="text-green-600 hover:underline"
+                          >
+                            Submit
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -588,7 +820,7 @@ export default function ServiceRequests() {
                 {requests.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="py-4 text-center text-gray-500 text-sm"
                     >
                       No requests yet.
