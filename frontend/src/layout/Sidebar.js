@@ -1,4 +1,6 @@
 // src/layout/Sidebar.js
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiHome, FiUsers, FiBell, FiSettings, FiLogOut } from "react-icons/fi";
 import { removeToken, getUserRole } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
@@ -8,13 +10,13 @@ import API from "../api/api";
 export default function Sidebar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
-  const role = getUserRole(); // get logged-in role
+  const role = getUserRole();
 
   useEffect(() => {
-    loadNotifications();
+    fetchNotifications();
   }, []);
 
-  const loadNotifications = async () => {
+  const fetchNotifications = async () => {
     try {
       const res = await API.get("/notifications/admin");
       const unread = res.data.filter((n) => !n.read).length;
@@ -24,7 +26,7 @@ export default function Sidebar() {
     }
   };
 
-  const logoutHandler = () => {
+  const handleLogout = () => {
     removeToken();
     navigate("/login");
   };
