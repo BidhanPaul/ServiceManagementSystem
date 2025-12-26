@@ -100,4 +100,10 @@ public class AuthController {
         public String getUsername() { return username; }
         public String getRole() { return role; }
     }
+
+    //AuthResponse response = new AuthResponse(
+             //   token,
+             //   user.getUsername(),
+              //  user.getRole().name()
+     //   );
 }
