@@ -101,9 +101,5 @@ public class AuthController {
         public String getRole() { return role; }
     }
 
-    //AuthResponse response = new AuthResponse(
-             //   token,
-             //   user.getUsername(),
-              //  user.getRole().name()
-     //   );
+   
 }
