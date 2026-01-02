@@ -16,13 +16,13 @@ export default function Dashboard() {
   const [roleCounts, setRoleCounts] = useState({});
 
   const roleIcons = {
-    ADMIN: <FiShield className="text-blue-600 text-5xl md:text-7xl" />,
-    PROJECT_MANAGER: <FiUsers className="text-blue-600 text-5xl md:text-7xl" />,
-    PROCUREMENT_OFFICER: <FiTool className="text-blue-600 text-5xl md:text-7xl" />,
-    SERVICE_PROVIDER: <FiUser className="text-blue-600 text-5xl md:text-7xl" />,
+    ADMIN: <FiShield className="text-blue-600 text-3xl" />,
+    PROJECT_MANAGER: <FiUsers className="text-blue-600 text-3xl" />,
+    PROCUREMENT_OFFICER: <FiTool className="text-blue-600 text-3xl" />,
+    SERVICE_PROVIDER: <FiUser className="text-blue-600 text-3xl" />,
   };
 
-  const defaultIcon = <FiUser className="text-blue-600 text-5xl md:text-7xl" />;
+  const defaultIcon = <FiUser className="text-blue-600 text-3xl" />;
 
   useEffect(() => {
     loadCounts();
