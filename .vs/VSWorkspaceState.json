@@ -1,16 +1,16 @@
 {
   "ExpandedNodes": [
     "",
-    "\\.idea",
     "\\Documentation",
     "\\frontend",
     "\\frontend\\public",
     "\\frontend\\src",
+    "\\frontend\\src\\components",
     "\\frontend\\src\\pages",
     "\\Service-Management",
-    "\\Service-Management\\.mvn",
-    "\\Service-Management\\src"
+    "\\Service-Management\\src",
+    "\\Service-Management\\src\\main"
   ],
-  "SelectedNode": "\\frontend\\src\\pages\\Notifications.js",
+  "SelectedNode": "\\frontend\\src\\components\\ProcurementDashboard.js",
   "PreviewInSolutionExplorer": false
 }
