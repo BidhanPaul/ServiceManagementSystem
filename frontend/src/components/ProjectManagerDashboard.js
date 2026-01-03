@@ -418,6 +418,23 @@ const ProjectManagerDashboard = () => {
                                           Notes: {o.notes}
                                         </p>
                                       )}
+                                                </div>
+                                    <div className="text-right">
+                                      <p className="text-slate-700">
+                                        Daily rate:{" "}
+                                        <span className="font-semibold">
+                                          {o.dailyRate} €
+                                        </span>
+                                      </p>
+                                      <p className="text-slate-900 font-semibold">
+                                        Total: {o.totalCost} €
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           
 
 
