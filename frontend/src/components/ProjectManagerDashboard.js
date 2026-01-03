@@ -398,6 +398,26 @@ const ProjectManagerDashboard = () => {
                                   </p>
                                 );
                               }
+                              return (
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {offers.map((o) => (
+                                  <div
+                                    key={o.id}
+                                    className="border border-slate-200 rounded-xl p-2.5 text-xs flex justify-between gap-3"
+                                  >
+                                    <div>
+                                      <p className="font-semibold text-slate-900">
+                                        {o.specialistName || "Unnamed Specialist"}
+                                      </p>
+                                      <p className="text-slate-600">
+                                        Supplier: {o.supplierName} (
+                                        {o.contractualRelationship})
+                                      </p>
+                                      {o.notes && (
+                                        <p className="text-slate-500 mt-0.5">
+                                          Notes: {o.notes}
+                                        </p>
+                                      )}
                           
 
 
