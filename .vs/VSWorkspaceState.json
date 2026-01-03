@@ -1,10 +1,16 @@
 {
   "ExpandedNodes": [
     "",
+    "\\.idea",
     "\\Documentation",
     "\\frontend",
-    "\\frontend\\public"
+    "\\frontend\\public",
+    "\\frontend\\src",
+    "\\frontend\\src\\pages",
+    "\\Service-Management",
+    "\\Service-Management\\.mvn",
+    "\\Service-Management\\src"
   ],
-  "SelectedNode": "\\frontend\\public",
+  "SelectedNode": "\\frontend\\src\\pages\\Notifications.js",
   "PreviewInSolutionExplorer": false
 }
