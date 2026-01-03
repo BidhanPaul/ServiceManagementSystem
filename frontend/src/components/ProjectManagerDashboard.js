@@ -377,6 +377,33 @@ const ProjectManagerDashboard = () => {
                           </span>
                         </div>
 
+                        {/* Offers modal */}
+                        {offerModalOpen && offerModalRequest && (
+                          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
+                            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-lg border border-slate-100">
+                              <h3 className="text-lg font-semibold mb-2 text-slate-900">
+                                Offers for "{offerModalRequest.title}"
+                              </h3>
+                              <p className="text-xs text-slate-600 mb-3">
+                                Project: {projectLabel(offerModalRequest)} • Contract:{" "}
+                                {contractLabel(offerModalRequest)}
+                              </p>
+                              {(() => {
+                              const offers =
+                                offersByRequestId[offerModalRequest.id] || [];
+                              if (offers.length === 0) {
+                                return (
+                                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-3 py-4 text-center">
+                                    No offers have been submitted yet for this request.
+                                  </p>
+                                );
+                              }
+                          
+
+
+
+
+
                         {offers.length === 0 ? (
                           <p className="text-xs text-gray-500">
                             No offers received yet.
@@ -421,6 +448,7 @@ const ProjectManagerDashboard = () => {
     </div>
   );
 };
+      
 
 export default ProjectManagerDashboard;
 
