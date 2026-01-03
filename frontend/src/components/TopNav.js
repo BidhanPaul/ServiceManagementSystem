@@ -10,20 +10,36 @@ export default function TopNav() {
   return (
     <div className="flex items-center justify-between px-6 py-4 backdrop-blur-md text-white mb-6">
       {/* User Info */}
-      <div className="flex items-center gap-3 font-medium text-blue-600">
-        <FiUser />
-        <span>
-          {username} <span className="text-gray-500">({role})</span>
-        </span>
+      <div className="flex items-center gap-3">
+        <div className="bg-blue-100 p-3 rounded-full shadow-sm">
+          <FiUser className="text-blue-700 text-xl" />
+        </div>
+
+        <div className="flex flex-col leading-tight">
+          <span className="font-semibold text-gray-800 text-sm md:text-base">
+            {username}
+          </span>
+          <span className="text-xs text-blue-600 font-medium">{role}</span>
+        </div>
       </div>
 
       {/* Navigation Actions */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+          className="
+            flex items-center gap-2
+            bg-white/70 backdrop-blur-md
+            px-4 py-2 rounded-xl
+            border border-white/50
+            shadow-sm
+            text-blue-700 font-medium
+            hover:bg-white hover:shadow-md
+            transition
+          "
         >
-          <FiHome /> Dashboard
+          <FiHome className="text-lg" />
+          Dashboard
         </button>
 
         <button
@@ -31,9 +47,16 @@ export default function TopNav() {
             removeToken();
             navigate("/login");
           }}
-          className="flex items-center gap-2 text-red-500 hover:text-red-700"
+          className="
+            flex items-center gap-2
+            bg-red-500 text-white
+            px-4 py-2 rounded-xl
+            shadow-md hover:bg-red-600
+            transition font-medium
+          "
         >
-          <FiLogOut /> Logout
+          <FiLogOut className="text-lg" />
+          Logout
         </button>
       </div>
     </div>
