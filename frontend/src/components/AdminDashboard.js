@@ -60,13 +60,13 @@ export default function Dashboard() {
               Admin Dashboard
             </h1>
             <p className="text-sm text-slate-600 mt-1">
-              System overview, user role distribution, and recent signup
-              activity.
+              System overview, user role distribution, and recent signup activity.
             </p>
           </header>
 
           {/* ---------- STAT CARDS ---------- */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
             {/* Total Users */}
             <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="inline-flex items-center justify-center rounded-2xl bg-blue-50 w-12 h-12">
@@ -113,38 +113,42 @@ export default function Dashboard() {
 
           {/* ---------- CHARTS ROW ---------- */}
           {/* ---------- CHARTS ROW ---------- */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 auto-rows-[1fr]">
-            {/* Pie Chart */}
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
-              <h2 className="text-base font-semibold text-slate-900 mb-1">
-                Employees by Role
-              </h2>
-              <p className="text-xs text-slate-500 mb-3">
-                Visual distribution of user roles.
-              </p>
+<section className="grid grid-cols-1 lg:grid-cols-2 gap-4 auto-rows-[1fr]">
 
-              <div className="flex-1 flex items-center justify-center">
-                <UserRolePieChart />
-              </div>
-            </div>
+  {/* Pie Chart */}
+  <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
+    <h2 className="text-base font-semibold text-slate-900 mb-1">
+      Employees by Role
+    </h2>
+    <p className="text-xs text-slate-500 mb-3">
+      Visual distribution of user roles.
+    </p>
 
-            {/* Recent Signups */}
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
-              <h2 className="text-base font-semibold text-slate-900 mb-1">
-                Recent Signups
-              </h2>
-              <p className="text-xs text-slate-500 mb-3">
-                Latest registered users.
-              </p>
+    <div className="flex-1 flex items-center justify-center">
+      <UserRolePieChart />
+    </div>
+  </div>
 
-              {/* Scrollable list inside fixed panel */}
-              <div className="flex-1 overflow-y-auto pr-1">
-                <RecentUsersTimeline />
-              </div>
-            </div>
-          </section>
+  {/* Recent Signups */}
+  <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
+    <h2 className="text-base font-semibold text-slate-900 mb-1">
+      Recent Signups
+    </h2>
+    <p className="text-xs text-slate-500 mb-3">
+      Latest registered users.
+    </p>
+
+    {/* Scrollable list inside fixed panel */}
+    <div className="flex-1 overflow-y-auto pr-1">
+      <RecentUsersTimeline />
+    </div>
+  </div>
+
+</section>
+
         </div>
       </div>
     </div>
   );
 }
+
