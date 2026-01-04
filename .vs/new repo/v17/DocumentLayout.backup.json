@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ProcurementDashboard.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\components\\ProcurementDashboard.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\pages\\Notifications.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\pages\\Notifications.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
     },
@@ -47,6 +51,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "ProcurementDashboard.js",
+              "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ProcurementDashboard.js",
+              "RelativeDocumentMoniker": "frontend\\src\\components\\ProcurementDashboard.js",
+              "ToolTip": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ProcurementDashboard.js",
+              "RelativeToolTip": "frontend\\src\\components\\ProcurementDashboard.js",
+              "ViewState": "AgIAAHUAAAAAAAAAAAAswIEAAAA7AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-01-03T00:05:01.702Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "Notifications.js",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\pages\\Notifications.js",
               "RelativeDocumentMoniker": "frontend\\src\\pages\\Notifications.js",
@@ -59,7 +76,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "index.html",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\public\\index.html",
               "RelativeDocumentMoniker": "frontend\\public\\index.html",
@@ -67,12 +84,11 @@
               "RelativeToolTip": "frontend\\public\\index.html",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
-              "WhenOpened": "2025-12-30T17:56:34.376Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-30T17:56:34.376Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "README.md",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\README.md",
               "RelativeDocumentMoniker": "README.md",
