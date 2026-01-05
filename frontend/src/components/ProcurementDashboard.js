@@ -1,12 +1,10 @@
 // src/components/ProcurementDashboard.js
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../layout/Sidebar";
 import TopNav from "./TopNav";
 import API from "../api/api";
 import { toast } from "react-toastify";
-
-const MOCK_API_BASE = "https://69233a5309df4a492324c022.mockapi.io";
 
 const ProcurementDashboard = () => {
     const navigate = useNavigate();
@@ -31,43 +29,45 @@ const ProcurementDashboard = () => {
 
     // -------- LOAD DATA --------
 
-    const fetchMockList = useCallback(async (path, setter, label) => {
+  const loadProjectsFromMock = async () => {
         try {
-            const res = await fetch(`${MOCK_API_BASE}/${path}`);
-            const data = await res.json();
-            setter(Array.isArray(data) ? data : []);
-        } catch (err) {
-            console.error(`Failed to load ${label} from mockapi`, err);
-            setter([]);
+      const res = await fetch(
+        "https://69233a5309df4a492324c022.mockapi.io/Projects"
+      );
+      const data = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load projects from mockapi", err);
+    }
+  };
+
+  const loadContractsFromMock = async () => {
+    try {
+      const res = await fetch(
+        "https://69233a5309df4a492324c022.mockapi.io/Contracts"
+      );
+      const data = await res.json();
+      setContracts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load contracts from mockapi", err);
         }
-    }, []);
+  };
 
-    const loadProjectsFromMock = useCallback(
-        () => fetchMockList("Projects", setProjects, "projects"),
-        [fetchMockList]
-    );
-
-    const loadContractsFromMock = useCallback(
-        () => fetchMockList("Contracts", setContracts, "contracts"),
-        [fetchMockList]
-    );
-
-    const loadRequests = useCallback(async () => {
+  const loadRequests = async () => {
         try {
             const res = await API.get("/requests");
-            setRequests(Array.isArray(res.data) ? res.data : []);
+      setRequests(res.data || []);
         } catch (err) {
             console.error("Failed to load requests", err);
-            setRequests([]);
         }
-    }, []);
+  };
 
-    const loadOffersForRequests = useCallback(async (reqs) => {
+  const loadOffersForRequests = async (reqs) => {
         try {
             const promises = reqs.map((r) =>
                 API.get(`/requests/${r.id}/offers`).then((res) => ({
                     requestId: r.id,
-                    offers: Array.isArray(res.data) ? res.data : [],
+          offers: res.data || [],
                 }))
             );
 
@@ -129,7 +129,7 @@ const ProcurementDashboard = () => {
             const id = req.projectIds[0];
             const proj = projects.find((p) => p.id === id);
             if (!proj) return id;
-            return `${proj.customer} – ${proj.name}`;
+            return `${proj.customer} ï¿½ ${proj.name}`;
         },
         [projects]
     );
@@ -140,7 +140,7 @@ const ProcurementDashboard = () => {
             const id = req.contractIds[0];
             const c = contracts.find((x) => x.id === id);
             if (!c) return id;
-            return `${c.supplier} – ${c.domain}`;
+            return `${c.supplier} ï¿½ ${c.domain}`;
         },
         [contracts]
     );
