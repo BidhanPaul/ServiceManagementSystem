@@ -377,6 +377,20 @@ const ProjectManagerDashboard = () => {
                           </span>
                         </div>
 
+                        {/* Offers for my requests (compact overview, like before) */}
+                        <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                                Offers for My Requests
+                              </h2>
+                              <p className="text-xs text-slate-500">
+                                Quick view of offers that suppliers have submitted for
+                                your service requests.
+                              </p>
+                            </div>
+                          </div>
+
                         {/* Offers modal */}
                         {offerModalOpen && offerModalRequest && (
                           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
