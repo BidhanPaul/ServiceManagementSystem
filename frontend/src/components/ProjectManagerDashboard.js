@@ -390,6 +390,19 @@ const ProjectManagerDashboard = () => {
                               </p>
                             </div>
                           </div>
+                          {myRequests.length === 0 ? (
+                            <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                              You have no requests, so there are no offers yet.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {myRequests.map((req) => {
+                                const offers = offersByRequestId[req.id] || [];
+                                return (
+                                  <div
+                                    key={req.id}
+                                    className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
+                                  >
 
                         {/* Offers modal */}
                         {offerModalOpen && offerModalRequest && (
