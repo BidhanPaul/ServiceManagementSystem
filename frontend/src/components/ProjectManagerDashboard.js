@@ -403,6 +403,28 @@ const ProjectManagerDashboard = () => {
                                     key={req.id}
                                     className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
                                   >
+                                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
+                                      <div>
+                                        <p className="font-semibold text-slate-900 text-sm">
+                                          {req.title}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500">
+                                          {projectLabel(req)} • {contractLabel(req)}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={
+                                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
+                                            statusBadgeClass(req.status)
+                                          }
+                                          ></span>
+
+
+
+
+
+
 
                         {/* Offers modal */}
                         {offerModalOpen && offerModalRequest && (
