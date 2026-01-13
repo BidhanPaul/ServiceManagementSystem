@@ -30,11 +30,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ FIX
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -45,27 +43,33 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
 
-                        // Allow PM to create requests
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**")
-                        .hasAnyRole("PROJECT_MANAGER")
+                        // ✅ external refs: allow logged-in users (or permitAll if you prefer)
+                        .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/pm-whitelist/validate").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/import").hasRole("ADMIN")
 
-                        // Allow PM & Procurement to view them
+
+                        // ✅ notifications: ANY logged-in user can send DM/support to admin or others
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/user/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/**").hasRole("ADMIN")
+
+                        // ✅ requests rules (keep yours)
+                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
                         .requestMatchers(HttpMethod.GET, "/api/requests/**")
-                        .hasAnyRole("PROJECT_MANAGER", "PROCUREMENT_OFFICER")
-
+                        .hasAnyRole("ADMIN", "PROJECT_MANAGER", "PROCUREMENT_OFFICER", "RESOURCE_PLANNER", "SERVICE_PROVIDER")
                         .anyRequest().authenticated()
                 )
 
-
-
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 🔥 Proper CORS configuration here
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

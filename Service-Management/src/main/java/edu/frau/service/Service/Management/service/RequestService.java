@@ -8,24 +8,33 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RequestService {
-
-    // basic CRUD you already had
     ServiceRequest createRequest(ServiceRequest request);
+
     Optional<ServiceRequest> getRequestById(Long id);
+
     List<ServiceRequest> getAllRequests();
-    Optional<ServiceRequest> updateRequest(Long id, ServiceRequest request);
+
+    Optional<ServiceRequest> updateRequest(Long id, ServiceRequest updated);
+
     boolean deleteRequest(Long id);
 
-    // workflow
+    boolean adminDeleteRequest(Long id);
+
+
     ServiceRequest submitForReview(Long id, String username);
+
     ServiceRequest approveForBidding(Long id, String approverUsername);
+
     ServiceRequest reject(Long id, String approverUsername, String reason);
 
-    // offers
     ServiceOffer addOffer(Long requestId, ServiceOffer offer);
+
     List<ServiceOffer> getOffersForRequest(Long requestId);
+
     ServiceRequest selectPreferredOffer(Long requestId, Long offerId, String decidedBy);
 
-    // order
     ServiceOrder createServiceOrderFromOffer(Long offerId, String decidedBy);
+
+    // ✅ NEW
+    ServiceRequest reactivateBidding(Long requestId);
 }

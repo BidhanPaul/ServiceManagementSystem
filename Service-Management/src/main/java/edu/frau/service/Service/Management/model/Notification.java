@@ -11,6 +11,7 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 2000)
     private String message;
 
     private String recipientUsername;
@@ -18,20 +19,24 @@ public class Notification {
     @Enumerated(EnumType.STRING)
     private Role recipientRole;
 
+    // ✅ NEW: distinguish system vs DM
+    @Enumerated(EnumType.STRING)
+    private NotificationCategory category = NotificationCategory.SYSTEM;
+
+    // ✅ NEW: for DM conversation
+    private String senderUsername;
+
+    @Enumerated(EnumType.STRING)
+    private Role senderRole;
+
+    private String threadKey; // e.g. "REQ-12:pmUser:poUser"
+    private String requestId; // optional
+
     private Instant sentAt;
 
     private boolean read;
 
-    // Constructors
     public Notification() {}
-
-    public Notification(String message, String recipientUsername, Role recipientRole, Instant sentAt, boolean read) {
-        this.message = message;
-        this.recipientUsername = recipientUsername;
-        this.recipientRole = recipientRole;
-        this.sentAt = sentAt;
-        this.read = read;
-    }
 
     // Getters & Setters
     public Long getId() { return id; }
@@ -45,6 +50,21 @@ public class Notification {
 
     public Role getRecipientRole() { return recipientRole; }
     public void setRecipientRole(Role recipientRole) { this.recipientRole = recipientRole; }
+
+    public NotificationCategory getCategory() { return category; }
+    public void setCategory(NotificationCategory category) { this.category = category; }
+
+    public String getSenderUsername() { return senderUsername; }
+    public void setSenderUsername(String senderUsername) { this.senderUsername = senderUsername; }
+
+    public Role getSenderRole() { return senderRole; }
+    public void setSenderRole(Role senderRole) { this.senderRole = senderRole; }
+
+    public String getThreadKey() { return threadKey; }
+    public void setThreadKey(String threadKey) { this.threadKey = threadKey; }
+
+    public String getRequestId() { return requestId; }
+    public void setRequestId(String requestId) { this.requestId = requestId; }
 
     public Instant getSentAt() { return sentAt; }
     public void setSentAt(Instant sentAt) { this.sentAt = sentAt; }

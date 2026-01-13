@@ -18,6 +18,9 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Autowired
+    private PmWhitelistService pmWhitelistService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -25,11 +28,22 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User register(User user) {
+
         if (userRepository.existsByUsername(user.getUsername()))
             throw new RuntimeException("Username already exists");
 
         if (userRepository.existsByEmail(user.getEmail()))
             throw new RuntimeException("Email already registered");
+
+        // ✅ ONLY PM validation via external employee list by EMAIL
+        if (user.getRole() == Role.PROJECT_MANAGER) {
+            boolean ok = pmWhitelistService.isValidProjectManager(user.getEmail(), null, null);
+            if (!ok) {
+                throw new RuntimeException(
+                        "You are not authorized to register as PROJECT_MANAGER. Use a valid company PM email."
+                );
+            }
+        }
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User saved = userRepository.save(user);
@@ -108,8 +122,6 @@ public class UserServiceImpl implements UserService {
 
         return saved;
     }
-
-
 
     @Override
     public boolean deleteById(UUID id) {
