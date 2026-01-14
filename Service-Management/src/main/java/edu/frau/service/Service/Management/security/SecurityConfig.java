@@ -42,12 +42,16 @@ public class SecurityConfig {
                                 "/api/public/**",
                                 "/api-index",
                                 "/actuator/health",
+
+                                // Swagger
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
+                                "/v3/api-docs",
                                 "/v3/api-docs/**",
 
                                 "/error"
                         ).permitAll()
+
 
                         // ✅ external refs: allow logged-in users (or permitAll if you prefer)
                         .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
