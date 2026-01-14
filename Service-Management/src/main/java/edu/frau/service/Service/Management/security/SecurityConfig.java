@@ -74,6 +74,8 @@ public class SecurityConfig {
 
                         // ✅ Notifications
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/direct-message").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/dm").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")

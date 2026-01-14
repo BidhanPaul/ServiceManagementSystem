@@ -63,24 +63,49 @@ public class NotificationServiceImpl implements NotificationService {
             Role recipientRole,
             String message
     ) {
-        Notification n = new Notification();
-        n.setCategory(NotificationCategory.DIRECT_MESSAGE);
+        // 1) Recipient copy
+        Notification toRecipient = new Notification();
+        toRecipient.setCategory(NotificationCategory.DIRECT_MESSAGE);
 
-        n.setThreadKey(threadKey);
-        n.setRequestId(requestId);
+        toRecipient.setThreadKey(threadKey);
+        toRecipient.setRequestId(requestId);
 
-        n.setSenderUsername(senderUsername);
-        n.setSenderRole(senderRole);
+        toRecipient.setSenderUsername(senderUsername);
+        toRecipient.setSenderRole(senderRole);
 
-        n.setRecipientUsername(recipientUsername);
-        n.setRecipientRole(recipientRole);
+        toRecipient.setRecipientUsername(recipientUsername);
+        toRecipient.setRecipientRole(recipientRole);
 
-        n.setMessage(message);
-        n.setSentAt(Instant.now());
-        n.setRead(false);
+        toRecipient.setMessage(message);
+        toRecipient.setSentAt(Instant.now());
+        toRecipient.setRead(false);
 
-        return notificationRepository.save(n);
+        notificationRepository.save(toRecipient);
+
+        // 2) Sender copy (so sender also sees it in their own DM thread)
+        Notification toSender = new Notification();
+        toSender.setCategory(NotificationCategory.DIRECT_MESSAGE);
+
+        toSender.setThreadKey(threadKey);
+        toSender.setRequestId(requestId);
+
+        toSender.setSenderUsername(senderUsername);
+        toSender.setSenderRole(senderRole);
+
+        // ✅ store to sender inbox
+        toSender.setRecipientUsername(senderUsername);
+        toSender.setRecipientRole(senderRole);
+
+        toSender.setMessage(message);
+        toSender.setSentAt(Instant.now());
+        toSender.setRead(true); // optional: sender copy can be auto-read
+
+        notificationRepository.save(toSender);
+
+        // return the recipient copy (or sender copy, doesn't matter)
+        return toRecipient;
     }
+
 
     // ---------------- GETTERS ----------------
 
