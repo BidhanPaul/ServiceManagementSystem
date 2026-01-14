@@ -13,10 +13,10 @@ import {
 import { toast } from "react-toastify";
 
 /**
- * DM format:
+ * OLD DM format (legacy):
  * DM:from=<user>;to=<user>;req=<id>; <text>
  */
-function parseDm(message) {
+function parseLegacyDm(message) {
   if (!message || typeof message !== "string") return null;
   if (!message.startsWith("DM:")) return null;
 
@@ -32,16 +32,38 @@ function parseDm(message) {
   const req = reqPart ? reqPart.trim().replace("req=", "") : "";
 
   const text = parts.length >= 4 ? parts.slice(3).join(";").trim() : "";
-
   return { from, to, req, text };
 }
 
-function makeThreadKey(dm) {
-  const a = (dm?.from || "").trim();
-  const b = (dm?.to || "").trim();
-  const req = (dm?.req || "").trim();
-  const users = [a, b].sort();
-  return `REQ:${req}|U:${users[0]}|${users[1]}`;
+// Normalize a notification into a DM object (works for both NEW + OLD)
+function normalizeDmNotification(n) {
+  if (!n) return null;
+
+  // ✅ NEW backend DM format
+  if (n.category === "DIRECT_MESSAGE") {
+    const from = n.senderUsername || "";
+    const to = n.recipientUsername || "";
+    const req = (n.requestId ?? "").toString();
+    const text = n.message || "";
+
+    // ThreadKey from backend if present, otherwise compute stable
+    const users = [from, to].filter(Boolean).sort();
+    const threadKey =
+      n.threadKey ||
+      `REQ-${req}:${users[0] || "?"}-${users[1] || "?"}`;
+
+    return { from, to, req, text, threadKey, _source: "NEW" };
+  }
+
+  // ✅ OLD legacy DM format stored as SYSTEM message but begins with DM:
+  const legacy = parseLegacyDm(n.message);
+  if (legacy) {
+    const users = [legacy.from, legacy.to].filter(Boolean).sort();
+    const threadKey = `REQ:${legacy.req}|U:${users[0] || "?"}|${users[1] || "?"}`;
+    return { ...legacy, threadKey, _source: "LEGACY" };
+  }
+
+  return null;
 }
 
 export default function Notifications() {
@@ -60,7 +82,7 @@ export default function Notifications() {
   const [requestTitleById, setRequestTitleById] = useState({});
 
   const username = localStorage.getItem("username");
-  const role = localStorage.getItem("role"); // ADMIN, PROJECT_MANAGER, PROCUREMENT_OFFICER, RESOURCE_PLANNER
+  const role = localStorage.getItem("role");
 
   // -------- LOAD NOTIFICATIONS --------
   useEffect(() => {
@@ -101,7 +123,7 @@ export default function Notifications() {
     }
   };
 
-  // ✅ NEW: MARK ALL AS READ (fixes badge stuck)
+  // ✅ MARK ALL AS READ
   const markAllAsRead = async () => {
     try {
       const unread = (notifications || []).filter((n) => !n.read);
@@ -111,7 +133,6 @@ export default function Notifications() {
       }
 
       await Promise.all(unread.map((n) => API.post(`/notifications/${n.id}/read`)));
-
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       toast.success("All notifications marked as read.");
     } catch (err) {
@@ -120,11 +141,12 @@ export default function Notifications() {
     }
   };
 
-  // ✅ NEW: MARK CURRENT TAB AS READ
+  // ✅ MARK CURRENT TAB AS READ
   const markTabAsRead = async () => {
     try {
-      const list = activeTab === "DM" ? dmItems : systemItems;
+      const list = activeTab === "DM" ? dmFlatItems : systemItems;
       const unread = (list || []).filter((n) => !n.read);
+
       if (unread.length === 0) {
         toast.info(`No unread ${activeTab === "DM" ? "DMs" : "system notifications"}.`);
         return;
@@ -136,33 +158,34 @@ export default function Notifications() {
         prev.map((n) => (unread.some((u) => u.id === n.id) ? { ...n, read: true } : n))
       );
 
-      toast.success(`${activeTab === "DM" ? "Direct messages" : "System notifications"} marked as read.`);
+      toast.success(
+        `${activeTab === "DM" ? "Direct messages" : "System notifications"} marked as read.`
+      );
     } catch (err) {
       console.error("Failed to mark tab as read", err);
       toast.error("Failed to mark tab as read.");
     }
   };
 
-  // -------- SPLIT DM vs SYSTEM --------
-  const dmItems = useMemo(
-    () => (notifications || []).filter((n) => parseDm(n.message)),
-    [notifications]
-  );
+  // ✅ DM notifications = (category DIRECT_MESSAGE) OR legacy DM: message
+  const dmFlatItems = useMemo(() => {
+    return (notifications || []).filter((n) => normalizeDmNotification(n));
+  }, [notifications]);
 
-  const systemItems = useMemo(
-    () => (notifications || []).filter((n) => !parseDm(n.message)),
-    [notifications]
-  );
+  // ✅ System = everything that is NOT DM
+  const systemItems = useMemo(() => {
+    return (notifications || []).filter((n) => !normalizeDmNotification(n));
+  }, [notifications]);
 
   // -------- BUILD THREADS --------
   const dmThreads = useMemo(() => {
     const map = new Map();
 
-    for (const n of dmItems) {
-      const dm = parseDm(n.message);
+    for (const n of dmFlatItems) {
+      const dm = normalizeDmNotification(n);
       if (!dm) continue;
 
-      const key = makeThreadKey(dm);
+      const key = dm.threadKey || "NO_THREAD";
       if (!map.has(key)) {
         map.set(key, {
           key,
@@ -201,7 +224,7 @@ export default function Notifications() {
     });
 
     return threads;
-  }, [dmItems]);
+  }, [dmFlatItems]);
 
   // -------- LOAD REQUEST TITLES --------
   useEffect(() => {
@@ -257,11 +280,13 @@ export default function Notifications() {
     setReplyTarget({
       otherUsername: other,
       reqId: thread.reqId || "",
+      threadKey: thread.key,
     });
     setReplyText("");
     setReplyOpen(true);
   };
 
+  // ✅ Reply using DIRECT MESSAGE endpoint (so it stays DIRECT_MESSAGE)
   const sendReply = async () => {
     if (!replyTarget?.otherUsername) {
       toast.error("No recipient found for reply.");
@@ -273,17 +298,19 @@ export default function Notifications() {
     }
 
     try {
-      const msg = `DM:from=${username};to=${replyTarget.otherUsername};req=${replyTarget.reqId}; ${replyText}`;
-
-      // send to other user
-      await API.post(`/notifications/user/${replyTarget.otherUsername}`, msg, {
-        headers: { "Content-Type": "text/plain" },
-      });
-
-      // save copy for me (so my sent appears)
-      await API.post(`/notifications/user/${username}`, msg, {
-        headers: { "Content-Type": "text/plain" },
-      });
+      await API.post(
+        "/notifications/direct-message",
+        {
+          threadKey: replyTarget.threadKey,
+          requestId: String(replyTarget.reqId || ""),
+          senderUsername: username,
+          senderRole: role, // must match backend Role enum
+          recipientUsername: replyTarget.otherUsername,
+          recipientRole: "PROJECT_MANAGER", // if replying to PM threads; UI can be extended later
+          message: replyText,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
 
       toast.success("Reply sent.");
       setReplyOpen(false);
@@ -333,16 +360,13 @@ export default function Notifications() {
     </div>
   );
 
-  // -------- THREAD UI --------
-  // ✅ Thread unread count (only received unread)
-const getThreadUnreadCount = (thread) => {
-  return (thread?.messages || []).filter(
-    (m) => m?.dm?.from !== username && !m.read
-  ).length;
-};
-
-// ✅ Optional: show "NEW" dot if there is any unread
-const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
+  // ✅ unread count per thread (only received unread)
+  const getThreadUnreadCount = (thread) => {
+    return (thread?.messages || []).filter(
+      (m) => m?.dm?.from !== username && !m.read
+    ).length;
+  };
+  const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
 
   const renderThread = (thread) => {
     const reqTitle =
@@ -358,24 +382,20 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
         key={thread.key}
         className="bg-white/70 border border-white/80 shadow-lg rounded-2xl p-4"
       >
-        {/* Header row */}
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-  <p className="text-lg font-bold text-slate-900">{reqTitle}</p>
+              <p className="text-lg font-bold text-slate-900">{reqTitle}</p>
 
-  {/* ✅ Unread indicator per thread */}
-  {threadHasUnread(thread) && (
-    <span className="inline-flex items-center gap-2">
-      {/* red dot */}
-      <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow" />
-      {/* unread count pill */}
-      <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-        {getThreadUnreadCount(thread)}
-      </span>
-    </span>
-  )}
-</div>
+              {threadHasUnread(thread) && (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow" />
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                    {getThreadUnreadCount(thread)}
+                  </span>
+                </span>
+              )}
+            </div>
 
             <p className="text-sm text-slate-600 mt-0.5">
               Conversation: <span className="font-medium">{me}</span> ↔{" "}
@@ -406,7 +426,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
           </div>
         </div>
 
-        {/* Messages (collapsed/expanded) */}
         {expanded && (
           <div className="mt-4 space-y-3">
             {thread.messages.map((m) => {
@@ -441,7 +460,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
                         </p>
                       </div>
 
-                      {/* ✅ Only received messages get mark read UI */}
                       {!isMine && !m.read ? (
                         <button
                           onClick={() => markRead(m.id)}
@@ -466,7 +484,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
     );
   };
 
-  // -------- ITEMS TO SHOW --------
   const itemsToShow = activeTab === "DM" ? dmThreads : systemItems;
 
   const unreadCountAll = useMemo(
@@ -491,7 +508,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
             </p>
           </div>
 
-          {/* ✅ NEW ACTIONS */}
           <div className="flex flex-wrap gap-2">
             <button
               onClick={markTabAsRead}
@@ -511,7 +527,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveTab("DM")}
@@ -539,13 +554,10 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
           </button>
         </div>
 
-        {/* Content */}
         <div className="space-y-4 max-w-4xl">
           {itemsToShow.length === 0 && (
             <p className="text-center text-slate-600 text-lg bg-white/50 backdrop-blur-md p-6 rounded-2xl border border-white/70 shadow">
-              No{" "}
-              {activeTab === "DM" ? "direct messages" : "system notifications"}{" "}
-              found.
+              No {activeTab === "DM" ? "direct messages" : "system notifications"} found.
             </p>
           )}
 
@@ -554,7 +566,6 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
             : itemsToShow.map((n) => renderSystemCard(n))}
         </div>
 
-        {/* Reply modal */}
         {replyOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
             <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
@@ -563,16 +574,12 @@ const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
               </h3>
 
               <p className="text-xs text-slate-600 mb-2">
-                To:{" "}
-                <span className="font-semibold">
-                  {replyTarget?.otherUsername}
-                </span>{" "}
+                To: <span className="font-semibold">{replyTarget?.otherUsername}</span>
                 {replyTarget?.reqId ? (
                   <>
-                    • Request:{" "}
+                    {" "}• Request:{" "}
                     <span className="font-semibold">
-                      {requestTitleById[replyTarget.reqId] ||
-                        `#${replyTarget.reqId}`}
+                      {requestTitleById[replyTarget.reqId] || `#${replyTarget.reqId}`}
                     </span>
                   </>
                 ) : null}

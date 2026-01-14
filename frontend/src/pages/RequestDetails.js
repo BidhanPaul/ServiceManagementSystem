@@ -82,29 +82,47 @@ export default function RequestDetails() {
   };
 
   const submitContactPm = async () => {
-    if (!request?.requestedByUsername) {
-      toast.error("This request has no Project Manager username.");
-      return;
-    }
-    if (!contactMessage.trim()) {
-      toast.error("Please write a message.");
-      return;
-    }
+  if (!request?.requestedByUsername) {
+    toast.error("This request has no Project Manager username.");
+    return;
+  }
+  if (!contactMessage.trim()) {
+    toast.error("Please write a message.");
+    return;
+  }
 
-    try {
-      await API.post(
-        `/notifications/user/${request.requestedByUsername}`,
-        `Message from Procurement Officer about request "${request.title}": ${contactMessage}`,
-        { headers: { "Content-Type": "text/plain" } }
-      );
-      toast.success("Message sent to Project Manager.");
-      setContactOpen(false);
-      setContactMessage("");
-    } catch (err) {
-      console.error("Failed to contact PM", err);
-      toast.error("Failed to send message to PM.");
-    }
-  };
+  try {
+    const senderUsername = localStorage.getItem("username");
+    const senderRole = localStorage.getItem("role"); // PROCUREMENT_OFFICER
+    const recipientUsername = request.requestedByUsername;
+    const recipientRole = "PROJECT_MANAGER";
+
+    const users = [senderUsername, recipientUsername].sort();
+    const threadKey = `REQ-${request.id}:${users[0]}-${users[1]}`;
+
+    await API.post(
+      "/notifications/direct-message",   // ✅ FIXED URL
+      {
+        threadKey,
+        requestId: String(request.id),
+        senderUsername,
+        senderRole,
+        recipientUsername,
+        recipientRole,
+        message: `About request "${request.title}": ${contactMessage}`,
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    toast.success("Message sent to Project Manager (DM).");
+    setContactOpen(false);
+    setContactMessage("");
+  } catch (err) {
+    console.error("Failed to contact PM (DM)", err?.response || err);
+    toast.error("Failed to send DM to PM.");
+  }
+};
+
 
   const approveRequest = async () => {
     try {
