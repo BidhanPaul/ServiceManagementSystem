@@ -40,6 +40,8 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/h2-console/**",
                                 "/api/public/**",
+                                "/api-index",
+                                "/actuator/health",
                                 "/error"
                         ).permitAll()
 
