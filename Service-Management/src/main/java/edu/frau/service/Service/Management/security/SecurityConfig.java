@@ -1,6 +1,5 @@
 package edu.frau.service.Service.Management.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,9 +12,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
 
@@ -23,8 +22,12 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Autowired
-    private JwtAuthFilter jwtAuthFilter;
+    private final JwtAuthFilter jwtAuthFilter;
+
+    // ✅ Constructor injection (recommended)
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -35,6 +38,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // ✅ Public endpoints
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
@@ -52,28 +57,32 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
 
+                        // ✅ Make GET /api/requests public (list + by id + any GET under /api/requests/**)
+                        .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
 
-                        // ✅ external refs: allow logged-in users (or permitAll if you prefer)
+                        // ✅ Keep write operations protected
+                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
+
+                        // ✅ External refs
                         .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
+
+                        // ✅ PM whitelist
                         .requestMatchers(HttpMethod.GET, "/api/pm-whitelist/validate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/import").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/**").hasRole("ADMIN")
 
-
-                        // ✅ notifications: ANY logged-in user can send DM/support to admin or others
+                        // ✅ Notifications
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/**").hasRole("ADMIN")
 
-                        // ✅ requests rules (keep yours)
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
-                        .requestMatchers(HttpMethod.GET, "/api/requests/**")
-                        .hasAnyRole("ADMIN", "PROJECT_MANAGER", "PROCUREMENT_OFFICER", "RESOURCE_PLANNER", "SERVICE_PROVIDER")
+                        // ✅ Everything else requires login
                         .anyRequest().authenticated()
                 )
 
+                // for H2 console frames (dev)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -84,7 +93,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
+
+        // Add your deployed frontend URL later if needed
         config.setAllowedOrigins(List.of("http://localhost:3000"));
+
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
