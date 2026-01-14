@@ -17,8 +17,8 @@ import { toast } from "react-toastify";
  * DM:from=<user>;to=<user>;req=<id>; <text>
  */
 function parseLegacyDm(message) {
-  if (!message || typeof message !== "string") return null;
-  if (!message.startsWith("DM:")) return null;
+    if (!message || typeof message !== "string") return null;
+    if (!message.startsWith("DM:")) return null;
 
     const raw = message.slice(3).trim(); // remove "DM:"
     const parts = raw.split(";");
@@ -31,39 +31,39 @@ function parseLegacyDm(message) {
     const to = toPart ? toPart.trim().replace("to=", "") : "";
     const req = reqPart ? reqPart.trim().replace("req=", "") : "";
 
-  const text = parts.length >= 4 ? parts.slice(3).join(";").trim() : "";
-  return { from, to, req, text };
+    const text = parts.length >= 4 ? parts.slice(3).join(";").trim() : "";
+    return { from, to, req, text };
 }
 
 // Normalize a notification into a DM object (works for both NEW + OLD)
 function normalizeDmNotification(n) {
-  if (!n) return null;
+    if (!n) return null;
 
-  // ✅ NEW backend DM format
-  if (n.category === "DIRECT_MESSAGE") {
-    const from = n.senderUsername || "";
-    const to = n.recipientUsername || "";
-    const req = (n.requestId ?? "").toString();
-    const text = n.message || "";
+    // ✅ NEW backend DM format
+    if (n.category === "DIRECT_MESSAGE") {
+        const from = n.senderUsername || "";
+        const to = n.recipientUsername || "";
+        const req = (n.requestId ?? "").toString();
+        const text = n.message || "";
 
-    // ThreadKey from backend if present, otherwise compute stable
-    const users = [from, to].filter(Boolean).sort();
-    const threadKey =
-      n.threadKey ||
-      `REQ-${req}:${users[0] || "?"}-${users[1] || "?"}`;
+        // ThreadKey from backend if present, otherwise compute stable
+        const users = [from, to].filter(Boolean).sort();
+        const threadKey =
+            n.threadKey ||
+            `REQ-${req}:${users[0] || "?"}-${users[1] || "?"}`;
 
-    return { from, to, req, text, threadKey, _source: "NEW" };
-  }
+        return { from, to, req, text, threadKey, _source: "NEW" };
+    }
 
-  // ✅ OLD legacy DM format stored as SYSTEM message but begins with DM:
-  const legacy = parseLegacyDm(n.message);
-  if (legacy) {
-    const users = [legacy.from, legacy.to].filter(Boolean).sort();
-    const threadKey = `REQ:${legacy.req}|U:${users[0] || "?"}|${users[1] || "?"}`;
-    return { ...legacy, threadKey, _source: "LEGACY" };
-  }
+    // ✅ OLD legacy DM format stored as SYSTEM message but begins with DM:
+    const legacy = parseLegacyDm(n.message);
+    if (legacy) {
+        const users = [legacy.from, legacy.to].filter(Boolean).sort();
+        const threadKey = `REQ:${legacy.req}|U:${users[0] || "?"}|${users[1] || "?"}`;
+        return { ...legacy, threadKey, _source: "LEGACY" };
+    }
 
-  return null;
+    return null;
 }
 
 export default function Notifications() {
@@ -81,8 +81,8 @@ export default function Notifications() {
     // request titles lookup
     const [requestTitleById, setRequestTitleById] = useState({});
 
-  const username = localStorage.getItem("username");
-  const role = localStorage.getItem("role");
+    const username = localStorage.getItem("username");
+    const role = localStorage.getItem("role");
 
     // -------- LOAD NOTIFICATIONS --------
     useEffect(() => {
@@ -123,34 +123,34 @@ export default function Notifications() {
         }
     };
 
-  // ✅ MARK ALL AS READ
-  const markAllAsRead = async () => {
-    try {
-      const unread = (notifications || []).filter((n) => !n.read);
-      if (unread.length === 0) {
-        toast.info("No unread notifications.");
-        return;
-      }
+    // ✅ MARK ALL AS READ
+    const markAllAsRead = async () => {
+        try {
+            const unread = (notifications || []).filter((n) => !n.read);
+            if (unread.length === 0) {
+                toast.info("No unread notifications.");
+                return;
+            }
 
-      await Promise.all(unread.map((n) => API.post(`/notifications/${n.id}/read`)));
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      toast.success("All notifications marked as read.");
-    } catch (err) {
-      console.error("Failed to mark all as read", err);
-      toast.error("Failed to mark all as read.");
-    }
-  };
+            await Promise.all(unread.map((n) => API.post(`/notifications/${n.id}/read`)));
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+            toast.success("All notifications marked as read.");
+        } catch (err) {
+            console.error("Failed to mark all as read", err);
+            toast.error("Failed to mark all as read.");
+        }
+    };
 
-  // ✅ MARK CURRENT TAB AS READ
-  const markTabAsRead = async () => {
-    try {
-      const list = activeTab === "DM" ? dmFlatItems : systemItems;
-      const unread = (list || []).filter((n) => !n.read);
+    // ✅ MARK CURRENT TAB AS READ
+    const markTabAsRead = async () => {
+        try {
+            const list = activeTab === "DM" ? dmFlatItems : systemItems;
+            const unread = (list || []).filter((n) => !n.read);
 
-      if (unread.length === 0) {
-        toast.info(`No unread ${activeTab === "DM" ? "DMs" : "system notifications"}.`);
-        return;
-      }
+            if (unread.length === 0) {
+                toast.info(`No unread ${activeTab === "DM" ? "DMs" : "system notifications"}.`);
+                return;
+            }
 
             await Promise.all(unread.map((n) => API.post(`/notifications/${n.id}/read`)));
 
@@ -158,42 +158,42 @@ export default function Notifications() {
                 prev.map((n) => (unread.some((u) => u.id === n.id) ? { ...n, read: true } : n))
             );
 
-      toast.success(
-        `${activeTab === "DM" ? "Direct messages" : "System notifications"} marked as read.`
-      );
-    } catch (err) {
-      console.error("Failed to mark tab as read", err);
-      toast.error("Failed to mark tab as read.");
-    }
-  };
+            toast.success(
+                `${activeTab === "DM" ? "Direct messages" : "System notifications"} marked as read.`
+            );
+        } catch (err) {
+            console.error("Failed to mark tab as read", err);
+            toast.error("Failed to mark tab as read.");
+        }
+    };
 
-  // ✅ DM notifications = (category DIRECT_MESSAGE) OR legacy DM: message
-  const dmFlatItems = useMemo(() => {
-    return (notifications || []).filter((n) => normalizeDmNotification(n));
-  }, [notifications]);
+    // ✅ DM notifications = (category DIRECT_MESSAGE) OR legacy DM: message
+    const dmFlatItems = useMemo(() => {
+        return (notifications || []).filter((n) => normalizeDmNotification(n));
+    }, [notifications]);
 
-  // ✅ System = everything that is NOT DM
-  const systemItems = useMemo(() => {
-    return (notifications || []).filter((n) => !normalizeDmNotification(n));
-  }, [notifications]);
+    // ✅ System = everything that is NOT DM
+    const systemItems = useMemo(() => {
+        return (notifications || []).filter((n) => !normalizeDmNotification(n));
+    }, [notifications]);
 
     // -------- BUILD THREADS --------
     const dmThreads = useMemo(() => {
         const map = new Map();
 
-    for (const n of dmFlatItems) {
-      const dm = normalizeDmNotification(n);
-      if (!dm) continue;
+        for (const n of dmFlatItems) {
+            const dm = normalizeDmNotification(n);
+            if (!dm) continue;
 
-      const key = dm.threadKey || "NO_THREAD";
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          reqId: dm.req || "",
-          participants: [dm.from, dm.to].filter(Boolean),
-          messages: [],
-        });
-      }
+            const key = dm.threadKey || "NO_THREAD";
+            if (!map.has(key)) {
+                map.set(key, {
+                    key,
+                    reqId: dm.req || "",
+                    participants: [dm.from, dm.to].filter(Boolean),
+                    messages: [],
+                });
+            }
 
             map.get(key).messages.push({
                 id: n.id,
@@ -223,8 +223,8 @@ export default function Notifications() {
             return lb - la;
         });
 
-    return threads;
-  }, [dmFlatItems]);
+        return threads;
+    }, [dmFlatItems]);
 
     // -------- LOAD REQUEST TITLES --------
     useEffect(() => {
@@ -277,40 +277,40 @@ export default function Notifications() {
             return;
         }
 
-    setReplyTarget({
-      otherUsername: other,
-      reqId: thread.reqId || "",
-      threadKey: thread.key,
-    });
-    setReplyText("");
-    setReplyOpen(true);
-  };
+        setReplyTarget({
+            otherUsername: other,
+            reqId: thread.reqId || "",
+            threadKey: thread.key,
+        });
+        setReplyText("");
+        setReplyOpen(true);
+    };
 
-  // ✅ Reply using DIRECT MESSAGE endpoint (so it stays DIRECT_MESSAGE)
-  const sendReply = async () => {
-    if (!replyTarget?.otherUsername) {
-      toast.error("No recipient found for reply.");
-      return;
-    }
-    if (!replyText.trim()) {
-      toast.error("Write a reply message.");
-      return;
-    }
+    // ✅ Reply using DIRECT MESSAGE endpoint (so it stays DIRECT_MESSAGE)
+    const sendReply = async () => {
+        if (!replyTarget?.otherUsername) {
+            toast.error("No recipient found for reply.");
+            return;
+        }
+        if (!replyText.trim()) {
+            toast.error("Write a reply message.");
+            return;
+        }
 
-    try {
-      await API.post(
-        "/notifications/direct-message",
-        {
-          threadKey: replyTarget.threadKey,
-          requestId: String(replyTarget.reqId || ""),
-          senderUsername: username,
-          senderRole: role, // must match backend Role enum
-          recipientUsername: replyTarget.otherUsername,
-          recipientRole: "PROJECT_MANAGER", // if replying to PM threads; UI can be extended later
-          message: replyText,
-        },
-        { headers: { "Content-Type": "application/json" } }
-      );
+        try {
+            await API.post(
+                "/notifications/direct-message",
+                {
+                    threadKey: replyTarget.threadKey,
+                    requestId: String(replyTarget.reqId || ""),
+                    senderUsername: username,
+                    senderRole: role, // must match backend Role enum
+                    recipientUsername: replyTarget.otherUsername,
+                    recipientRole: "PROJECT_MANAGER", // if replying to PM threads; UI can be extended later
+                    message: replyText,
+                },
+                { headers: { "Content-Type": "application/json" } }
+            );
 
             toast.success("Reply sent.");
             setReplyOpen(false);
@@ -359,13 +359,13 @@ export default function Notifications() {
         </div>
     );
 
-  // ✅ unread count per thread (only received unread)
-  const getThreadUnreadCount = (thread) => {
-    return (thread?.messages || []).filter(
-      (m) => m?.dm?.from !== username && !m.read
-    ).length;
-  };
-  const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
+    // ✅ unread count per thread (only received unread)
+    const getThreadUnreadCount = (thread) => {
+        return (thread?.messages || []).filter(
+            (m) => m?.dm?.from !== username && !m.read
+        ).length;
+    };
+    const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
 
     const renderThread = (thread) => {
         const reqTitle =
@@ -376,25 +376,25 @@ export default function Notifications() {
 
         const expanded = !!expandedThreads[thread.key];
 
-    return (
-      <div
-        key={thread.key}
-        className="bg-white/70 border border-white/80 shadow-lg rounded-2xl p-4"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-lg font-bold text-slate-900">{reqTitle}</p>
+        return (
+            <div
+                key={thread.key}
+                className="bg-white/70 border border-white/80 shadow-lg rounded-2xl p-4"
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <p className="text-lg font-bold text-slate-900">{reqTitle}</p>
 
-              {threadHasUnread(thread) && (
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow" />
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                    {getThreadUnreadCount(thread)}
-                  </span>
-                </span>
-              )}
-            </div>
+                            {threadHasUnread(thread) && (
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow" />
+                                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                                        {getThreadUnreadCount(thread)}
+                                    </span>
+                                </span>
+                            )}
+                        </div>
 
                         <p className="text-sm text-slate-600 mt-0.5">
                             Conversation: <span className="font-medium">{me}</span> ↔{" "}
@@ -425,10 +425,10 @@ export default function Notifications() {
                     </div>
                 </div>
 
-        {expanded && (
-          <div className="mt-4 space-y-3">
-            {thread.messages.map((m) => {
-              const isMine = m.dm?.from === username;
+                {expanded && (
+                    <div className="mt-4 space-y-3">
+                        {thread.messages.map((m) => {
+                            const isMine = m.dm?.from === username;
 
                             return (
                                 <div
@@ -457,31 +457,31 @@ export default function Notifications() {
                                                 </p>
                                             </div>
 
-                      {!isMine && !m.read ? (
-                        <button
-                          onClick={() => markRead(m.id)}
-                          className="bg-blue-600 text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow hover:bg-blue-700 transition whitespace-nowrap"
-                          type="button"
-                        >
-                          Mark as Read
-                        </button>
-                      ) : !isMine && m.read ? (
-                        <span className="flex items-center gap-1 text-[11px] text-green-600 font-medium whitespace-nowrap">
-                          <FiCheckCircle /> Read
-                        </span>
-                      ) : null}
+                                            {!isMine && !m.read ? (
+                                                <button
+                                                    onClick={() => markRead(m.id)}
+                                                    className="bg-blue-600 text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow hover:bg-blue-700 transition whitespace-nowrap"
+                                                    type="button"
+                                                >
+                                                    Mark as Read
+                                                </button>
+                                            ) : !isMine && m.read ? (
+                                                <span className="flex items-center gap-1 text-[11px] text-green-600 font-medium whitespace-nowrap">
+                                                    <FiCheckCircle /> Read
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
+                )}
+            </div>
+        );
+    };
 
-  const itemsToShow = activeTab === "DM" ? dmThreads : systemItems;
+    const itemsToShow = activeTab === "DM" ? dmThreads : systemItems;
 
     const unreadCountAll = useMemo(
         () => (notifications || []).filter((n) => !n.read).length,
@@ -505,14 +505,14 @@ export default function Notifications() {
                         </p>
                     </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={markTabAsRead}
-              className="px-4 py-2 rounded-full text-sm font-semibold bg-white/80 border border-slate-200 hover:bg-white transition"
-              type="button"
-            >
-              Mark {activeTab === "DM" ? "DM" : "System"} as Read
-            </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={markTabAsRead}
+                            className="px-4 py-2 rounded-full text-sm font-semibold bg-white/80 border border-slate-200 hover:bg-white transition"
+                            type="button"
+                        >
+                            Mark {activeTab === "DM" ? "DM" : "System"} as Read
+                        </button>
 
                         <button
                             onClick={markAllAsRead}
@@ -524,19 +524,18 @@ export default function Notifications() {
                     </div>
                 </div>
 
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab("DM")}
-            className={`px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 ${
-              activeTab === "DM"
-                ? "bg-indigo-600 text-white shadow"
-                : "bg-white/70 text-slate-700 border border-white/80"
-            }`}
-            type="button"
-          >
-            <FiMessageSquare />
-            Direct Messages ({dmThreads.length})
-          </button>
+                <div className="flex gap-2 mb-4">
+                    <button
+                        onClick={() => setActiveTab("DM")}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 ${activeTab === "DM"
+                                ? "bg-indigo-600 text-white shadow"
+                                : "bg-white/70 text-slate-700 border border-white/80"
+                            }`}
+                        type="button"
+                    >
+                        <FiMessageSquare />
+                        Direct Messages ({dmThreads.length})
+                    </button>
 
                     <button
                         onClick={() => setActiveTab("SYSTEM")}
@@ -550,36 +549,36 @@ export default function Notifications() {
                     </button>
                 </div>
 
-        <div className="space-y-4 max-w-4xl">
-          {itemsToShow.length === 0 && (
-            <p className="text-center text-slate-600 text-lg bg-white/50 backdrop-blur-md p-6 rounded-2xl border border-white/70 shadow">
-              No {activeTab === "DM" ? "direct messages" : "system notifications"} found.
-            </p>
-          )}
+                <div className="space-y-4 max-w-4xl">
+                    {itemsToShow.length === 0 && (
+                        <p className="text-center text-slate-600 text-lg bg-white/50 backdrop-blur-md p-6 rounded-2xl border border-white/70 shadow">
+                            No {activeTab === "DM" ? "direct messages" : "system notifications"} found.
+                        </p>
+                    )}
 
                     {activeTab === "DM"
                         ? itemsToShow.map((t) => renderThread(t))
                         : itemsToShow.map((n) => renderSystemCard(n))}
                 </div>
 
-        {replyOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
-            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
-              <h3 className="text-lg font-semibold mb-2 text-slate-900">
-                Reply Message
-              </h3>
+                {replyOpen && (
+                    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
+                        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
+                            <h3 className="text-lg font-semibold mb-2 text-slate-900">
+                                Reply Message
+                            </h3>
 
-              <p className="text-xs text-slate-600 mb-2">
-                To: <span className="font-semibold">{replyTarget?.otherUsername}</span>
-                {replyTarget?.reqId ? (
-                  <>
-                    {" "}• Request:{" "}
-                    <span className="font-semibold">
-                      {requestTitleById[replyTarget.reqId] || `#${replyTarget.reqId}`}
-                    </span>
-                  </>
-                ) : null}
-              </p>
+                            <p className="text-xs text-slate-600 mb-2">
+                                To: <span className="font-semibold">{replyTarget?.otherUsername}</span>
+                                {replyTarget?.reqId ? (
+                                    <>
+                                        {" "}• Request:{" "}
+                                        <span className="font-semibold">
+                                            {requestTitleById[replyTarget.reqId] || `#${replyTarget.reqId}`}
+                                        </span>
+                                    </>
+                                ) : null}
+                            </p>
 
                             <textarea
                                 value={replyText}

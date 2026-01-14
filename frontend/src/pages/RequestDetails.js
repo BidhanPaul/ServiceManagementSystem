@@ -81,41 +81,59 @@ export default function RequestDetails() {
         setContactOpen(true);
     };
 
-  const submitContactPm = async () => {
-  if (!request?.requestedByUsername) {
-    toast.error("This request has no Project Manager username.");
-    return;
-  }
-  if (!contactMessage.trim()) {
-    toast.error("Please write a message.");
-    return;
-  }
+    const submitContactPm = async () => {
+        if (!request?.requestedByUsername) {
+            toast.error("This request has no Project Manager username.");
+            return;
+        }
+        if (!contactMessage.trim()) {
+            toast.error("Please write a message.");
+            return;
+        }
 
-    try {
-      await API.post(
-        `/notifications/user/${request.requestedByUsername}`,
-        `Message from Procurement Officer about request "${request.title}": ${contactMessage}`,
-        { headers: { "Content-Type": "text/plain" } }
-      );
-      toast.success("Message sent to Project Manager.");
-      setContactOpen(false);
-      setContactMessage("");
-    } catch (err) {
-      console.error("Failed to contact PM", err);
-      toast.error("Failed to send message to PM.");
-    }
-  };
+        try {
+            const senderUsername = localStorage.getItem("username");
+            const senderRole = localStorage.getItem("role"); // PROCUREMENT_OFFICER
+            const recipientUsername = request.requestedByUsername;
+            const recipientRole = "PROJECT_MANAGER";
 
-  const approveRequest = async () => {
-    try {
-      await API.put(`/requests/${request.id}/approve`);
-      toast.success("Request approved for bidding.");
-      load();
-    } catch (err) {
-      console.error("Failed to approve request", err);
-      toast.error("Failed to approve request.");
-    }
-  };
+            const users = [senderUsername, recipientUsername].sort();
+            const threadKey = `REQ-${request.id}:${users[0]}-${users[1]}`;
+
+            await API.post(
+                "/notifications/direct-message",   // ✅ FIXED URL
+                {
+                    threadKey,
+                    requestId: String(request.id),
+                    senderUsername,
+                    senderRole,
+                    recipientUsername,
+                    recipientRole,
+                    message: `About request "${request.title}": ${contactMessage}`,
+                },
+                { headers: { "Content-Type": "application/json" } }
+            );
+
+            toast.success("Message sent to Project Manager (DM).");
+            setContactOpen(false);
+            setContactMessage("");
+        } catch (err) {
+            console.error("Failed to contact PM (DM)", err?.response || err);
+            toast.error("Failed to send DM to PM.");
+        }
+    };
+
+
+    const approveRequest = async () => {
+        try {
+            await API.put(`/requests/${request.id}/approve`);
+            toast.success("Request approved for bidding.");
+            load();
+        } catch (err) {
+            console.error("Failed to approve request", err);
+            toast.error("Failed to approve request.");
+        }
+    };
 
     const openReject = () => {
         setRejectReason("");
