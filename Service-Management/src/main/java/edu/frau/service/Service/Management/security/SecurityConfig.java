@@ -1,6 +1,5 @@
 package edu.frau.service.Service.Management.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,9 +12,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
 
@@ -23,54 +22,83 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Autowired
-    private JwtAuthFilter jwtAuthFilter;
+    private final JwtAuthFilter jwtAuthFilter;
+
+    // ✅ Constructor injection (recommended)
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ FIX
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // ✅ Public endpoints
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/h2-console/**",
                                 "/api/public/**",
+                                "/api-index",
+                                "/actuator/health",
+
+                                // Swagger
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+
                                 "/error"
                         ).permitAll()
 
-                        // Allow PM to create requests
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**")
-                        .hasAnyRole("PROJECT_MANAGER")
+                        // ✅ Make GET /api/requests public (list + by id + any GET under /api/requests/**)
+                        .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
 
-                        // Allow PM & Procurement to view them
-                        .requestMatchers(HttpMethod.GET, "/api/requests/**")
-                        .hasAnyRole("PROJECT_MANAGER", "PROCUREMENT_OFFICER")
+                        // ✅ Keep write operations protected
+                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
 
+                        // ✅ External refs
+                        .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
+
+                        // ✅ PM whitelist
+                        .requestMatchers(HttpMethod.GET, "/api/pm-whitelist/validate").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/import").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/**").hasRole("ADMIN")
+
+                        // ✅ Notifications
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/direct-message").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/dm").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/notifications/user/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
+
+                        // ✅ Everything else requires login
                         .anyRequest().authenticated()
                 )
 
-
-
+                // for H2 console frames (dev)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 🔥 Proper CORS configuration here
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
+
+        // Add your deployed frontend URL later if needed
         config.setAllowedOrigins(List.of("http://localhost:3000"));
+
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 

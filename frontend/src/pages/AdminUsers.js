@@ -52,70 +52,91 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gradient-to-br from-blue-200 to-blue-400">
+    <div className="min-h-screen bg-gradient-to-b from-blue-200 to-blue-400 p-6">
 
-      {/* 🔥 Top Navigation (No Sidebar Here) */}
+      {/* Top Navigation */}
       <TopNav />
 
-      <h1 className="text-3xl font-bold text-blue-800 mb-6">
+      {/* Page Header */}
+      <h1 className="text-3xl font-bold text-white drop-shadow mt-4 mb-6">
         👥 User Management
       </h1>
 
-      {/* Search Bar */}
-      <div className="flex items-center bg-white/30 backdrop-blur-xl border border-white/50 shadow-md rounded-xl px-4 py-2 mb-6 w-1/2">
-        <FiSearch className="text-gray-600 text-xl mr-3" />
+      {/* SEARCH BAR */}
+      <div className="flex items-center bg-white/50 backdrop-blur-xl border border-white/40 shadow-lg rounded-xl px-4 py-3 mb-8 w-full md:w-1/2">
+        <FiSearch className="text-gray-700 text-xl mr-3" />
         <input
           type="text"
           value={search}
           onChange={handleSearch}
           placeholder="Search users..."
-          className="w-full bg-transparent outline-none text-gray-800"
+          className="w-full bg-transparent outline-none text-gray-800 placeholder-gray-600"
         />
       </div>
 
-      {/* Users Table */}
-      <table className="w-full bg-white/40 backdrop-blur-xl rounded-xl overflow-hidden shadow-md">
-        <thead className="bg-blue-600 text-white">
-          <tr>
-            <th className="p-3 text-left">Username</th>
-            <th className="p-3 text-left">Email</th>
-            <th className="p-3 text-left">Role</th>
-            <th className="p-3 text-center">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {filteredUsers.length === 0 ? (
+      {/* USER TABLE */}
+      <div className="bg-white/50 backdrop-blur-xl rounded-2xl shadow-xl border border-white/40 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-blue-700/80 text-white">
             <tr>
-              <td colSpan="4" className="p-5 text-center text-gray-500">
-                No users found
-              </td>
+              <th className="p-3 text-left">Username</th>
+              <th className="p-3 text-left">Email</th>
+              <th className="p-3 text-left">Role</th>
+              <th className="p-3 text-center">Actions</th>
             </tr>
-          ) : (
-            filteredUsers.map((user) => (
-              <tr
-                key={user.id}
-                className="border-b border-gray-200 hover:bg-white/60 transition"
-              >
-                <td className="p-3">{user.username}</td>
-                <td className="p-3">{user.email}</td>
-                <td className="p-3 font-semibold text-blue-700">{user.role}</td>
+          </thead>
 
-                <td className="flex justify-center gap-4 p-3">
-                  <FiEdit
-                    className="text-blue-600 cursor-pointer text-xl hover:scale-110"
-                    onClick={() => openEditModal(user)}
-                  />
-                  <FiTrash2
-                    className="text-red-500 cursor-pointer text-xl hover:scale-110"
-                    onClick={() => setConfirmDelete(user)}
-                  />
+          <tbody>
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="p-6 text-center text-gray-600">
+                  No users found.
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              filteredUsers.map((user) => (
+                <tr
+                  key={user.id}
+                  className="border-b border-white/40 hover:bg-white/70 transition"
+                >
+                  <td className="p-3 font-medium">{user.username}</td>
+                  <td className="p-3">{user.email}</td>
+
+                  <td className="p-3">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                      {user.role}
+                    </span>
+                  </td>
+
+                  <td className="p-3 flex justify-center gap-3">
+                    {/* EDIT BUTTON */}
+                    <button
+                      onClick={() => openEditModal(user)}
+                      className="
+                        px-3 py-1 rounded-lg text-xs font-semibold 
+                        bg-blue-600 text-white shadow hover:bg-blue-700 flex items-center gap-1
+                      "
+                    >
+                      <FiEdit /> Edit
+                    </button>
+
+                    {/* DELETE BUTTON */}
+                    <button
+                      onClick={() => setConfirmDelete(user)}
+                      className="
+                        px-3 py-1 rounded-lg text-xs font-semibold 
+                        bg-red-600 text-white shadow hover:bg-red-700 flex items-center gap-1
+                      "
+                    >
+                      <FiTrash2 /> Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* EDIT MODAL */}
       {showEdit && (

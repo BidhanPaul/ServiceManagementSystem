@@ -1,6 +1,7 @@
 package edu.frau.service.Service.Management.model;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -15,28 +16,27 @@ public class ServiceRequest {
     private String title;
 
     @Enumerated(EnumType.STRING)
-    private RequestType type; // SINGLE, MULTI, TEAM, WORK_CONTRACT
+    private RequestType type;
 
-    /** USER WHO CREATED REQUEST — username only */
     private String requestedByUsername;
 
-    /** One project per request (from MockAPI / Group 1) */
+    private String requestedByRole;
+
+    // ✅ External references saved in DB
     private String projectId;
     private String projectName;
 
-    /** One contract per request (from MockAPI / Group 2) */
     private String contractId;
     private String contractSupplier;
 
     private LocalDate startDate;
     private LocalDate endDate;
 
-    private String performanceLocation; // Onshore / Nearshore / Offshore etc.
+    private String performanceLocation;
 
     private Integer maxOffers;
     private Integer maxAcceptedOffers;
 
-    /** Evaluation filters (from project JSON or manually) */
     @ElementCollection
     private List<String> requiredLanguages;
 
@@ -53,12 +53,10 @@ public class ServiceRequest {
     private String furtherInformation;
 
     @Enumerated(EnumType.STRING)
-    private RequestStatus status; // DRAFT, IN_REVIEW, APPROVED_FOR_BIDDING, BIDDING, ORDERED, REJECTED
+    private RequestStatus status;
 
-    /** Preferred offer (by id) after evaluation */
     private Long preferredOfferId;
 
-    /** Dynamic list of requested roles */
     @ElementCollection
     @CollectionTable(
             name = "service_request_roles",
@@ -66,10 +64,16 @@ public class ServiceRequest {
     )
     private List<RequestedRole> roles;
 
+    // ================= ✅ BIDDING CYCLE FIELDS =================
+    private Integer biddingCycleDays;  // 0 = demo (few seconds), 3/7/14 = days
+    private Instant biddingStartAt;
+    private Instant biddingEndAt;
+    private Boolean biddingActive;
+    // ===========================================================
+
     public ServiceRequest() {}
 
-    // ---------------- GETTERS & SETTERS ----------------
-
+    // ---- getters/setters ----
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -81,6 +85,9 @@ public class ServiceRequest {
 
     public String getRequestedByUsername() { return requestedByUsername; }
     public void setRequestedByUsername(String requestedByUsername) { this.requestedByUsername = requestedByUsername; }
+
+    public String getRequestedByRole() { return requestedByRole; }
+    public void setRequestedByRole(String requestedByRole) { this.requestedByRole = requestedByRole; }
 
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
@@ -132,4 +139,16 @@ public class ServiceRequest {
 
     public List<RequestedRole> getRoles() { return roles; }
     public void setRoles(List<RequestedRole> roles) { this.roles = roles; }
+
+    public Integer getBiddingCycleDays() { return biddingCycleDays; }
+    public void setBiddingCycleDays(Integer biddingCycleDays) { this.biddingCycleDays = biddingCycleDays; }
+
+    public Instant getBiddingStartAt() { return biddingStartAt; }
+    public void setBiddingStartAt(Instant biddingStartAt) { this.biddingStartAt = biddingStartAt; }
+
+    public Instant getBiddingEndAt() { return biddingEndAt; }
+    public void setBiddingEndAt(Instant biddingEndAt) { this.biddingEndAt = biddingEndAt; }
+
+    public Boolean getBiddingActive() { return biddingActive; }
+    public void setBiddingActive(Boolean biddingActive) { this.biddingActive = biddingActive; }
 }

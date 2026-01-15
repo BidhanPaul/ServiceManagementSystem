@@ -1,22 +1,28 @@
 package edu.frau.service.Service.Management.controller;
 
-import edu.frau.service.Service.Management.model.ServiceOffer;
-import edu.frau.service.Service.Management.model.ServiceOrder;
-import edu.frau.service.Service.Management.model.ServiceRequest;
+import edu.frau.service.Service.Management.model.*;
+import edu.frau.service.Service.Management.repository.UserRepository;
 import edu.frau.service.Service.Management.service.RequestService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("api/requests")
+@RequestMapping("/api/requests")
 @CrossOrigin(origins = "*")
 public class ServiceRequestController {
 
-    @Autowired
-    private RequestService requestService;
+    private final RequestService requestService;
+    private final UserRepository userRepository;
+
+    // ✅ Constructor injection only (NO @Autowired field injection)
+    public ServiceRequestController(RequestService requestService, UserRepository userRepository) {
+        this.requestService = requestService;
+        this.userRepository = userRepository;
+    }
 
     @GetMapping
     public List<ServiceRequest> getAll() {
@@ -78,6 +84,13 @@ public class ServiceRequestController {
         return ResponseEntity.ok(requestService.reject(id, "system", reason));
     }
 
+    // ✅ PM can reactivate an expired request
+    @PutMapping("/{id}/reactivate")
+    public ResponseEntity<ServiceRequest> reactivate(@PathVariable Long id) {
+        ServiceRequest updated = requestService.reactivateBidding(id);
+        return ResponseEntity.ok(updated);
+    }
+
     // ---- offers ----
 
     @GetMapping("/{id}/offers")
@@ -104,5 +117,25 @@ public class ServiceRequestController {
     @PostMapping("/offers/{offerId}/order")
     public ResponseEntity<ServiceOrder> createOrder(@PathVariable Long offerId) {
         return ResponseEntity.ok(requestService.createServiceOrderFromOffer(offerId, "system"));
+    }
+
+    // ✅ ADMIN delete ANY request regardless of status
+    @DeleteMapping("/{id}/admin")
+    public ResponseEntity<Void> adminDelete(@PathVariable Long id) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String username = auth.getName();
+
+        User u = userRepository.findByUsername(username).orElse(null);
+        if (u == null || u.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        boolean ok = requestService.adminDeleteRequest(id);
+        return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 }

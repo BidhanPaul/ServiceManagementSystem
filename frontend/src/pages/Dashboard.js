@@ -5,6 +5,7 @@ import AdminDashboard from "../components/AdminDashboard";
 import ProjectManagerDashboard from "../components/ProjectManagerDashboard";
 import ProcurementDashboard from "../components/ProcurementDashboard";
 import ServiceProviderDashboard from "../components/ServiceProviderDashboard";
+import ResourcePlannerDashboard from "../components/ResourcePlannerDashboard"; // ➕ NEW
 
 export default function Dashboard() {
   const role = getUserRole();
@@ -20,9 +21,15 @@ export default function Dashboard() {
       return <ProcurementDashboard />;
 
     case "SERVICE_PROVIDER":
-      return <ServiceProviderDashboard />;
+      return <ServiceProviderDashboard />
+    case "RESOURCE_PLANNER":                     
+      return <ResourcePlannerDashboard />;      
 
     default:
-      return <div className="text-red-500 p-6">Unknown role: {role}</div>;
+      return (
+        <div className="text-red-500 p-6">
+          Unknown role: {role}
+        </div>
+      );
   }
 }
