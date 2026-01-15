@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class RequestServiceImpl implements RequestService {
@@ -50,23 +51,44 @@ public class RequestServiceImpl implements RequestService {
     }
 
     private void ensureBiddingFields(ServiceRequest req) {
-        // ✅ allow 0 (demo); default only when null
         if (req.getBiddingCycleDays() == null) {
             req.setBiddingCycleDays(7);
         }
-        // if negative, fix to default
         if (req.getBiddingCycleDays() != null && req.getBiddingCycleDays() < 0) {
             req.setBiddingCycleDays(7);
         }
-
         if (req.getBiddingActive() == null) {
             req.setBiddingActive(false);
         }
     }
 
-
     private Instant nowInstant() {
         return Instant.now();
+    }
+
+    // ✅ NEW: Generate unique SR number like SR-8F3K1Z2A
+    private String generateUniqueRequestNumber() {
+        // few retries to avoid extremely rare collisions
+        for (int i = 0; i < 20; i++) {
+            String code = randomBase36(8);
+            String sr = "SR-" + code;
+            if (!requestRepository.existsByRequestNumber(sr)) {
+                return sr;
+            }
+        }
+        // fallback (very unlikely)
+        return "SR-" + randomBase36(12);
+    }
+
+    private String randomBase36(int len) {
+        // base36: 0-9A-Z
+        String chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        StringBuilder sb = new StringBuilder(len);
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        for (int i = 0; i < len; i++) {
+            sb.append(chars.charAt(r.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     // ---------- CRUD + workflow ----------
@@ -92,6 +114,11 @@ public class RequestServiceImpl implements RequestService {
         if (request.getMustHaveCriteria() == null) request.setMustHaveCriteria(List.of());
         if (request.getNiceToHaveCriteria() == null) request.setNiceToHaveCriteria(List.of());
         if (request.getRoles() == null) request.setRoles(List.of());
+
+        // ✅ SR number set once on creation (if not already provided)
+        if (request.getRequestNumber() == null || request.getRequestNumber().isBlank()) {
+            request.setRequestNumber(generateUniqueRequestNumber());
+        }
 
         ServiceRequest saved = requestRepository.save(request);
 
@@ -146,6 +173,7 @@ public class RequestServiceImpl implements RequestService {
                 existing.setBiddingCycleDays(updated.getBiddingCycleDays());
             }
 
+            // ✅ do NOT change requestNumber on update
             return requestRepository.save(existing);
         });
     }
@@ -171,7 +199,6 @@ public class RequestServiceImpl implements RequestService {
         req.setStatus(RequestStatus.IN_REVIEW);
         ServiceRequest saved = requestRepository.save(req);
 
-        // ✅ THIS WAS MISSING
         notificationService.sendToRole(
                 Role.PROCUREMENT_OFFICER,
                 "Request submitted for review: " + saved.getTitle()
@@ -179,7 +206,6 @@ public class RequestServiceImpl implements RequestService {
 
         return saved;
     }
-
 
     @Override
     public ServiceRequest approveForBidding(Long id, String approverUsername) {
@@ -191,7 +217,6 @@ public class RequestServiceImpl implements RequestService {
         Instant now = Instant.now();
         req.setBiddingStartAt(now);
 
-        // ✅ 0 = demo => 3 seconds
         if (req.getBiddingCycleDays() != null && req.getBiddingCycleDays() == 0) {
             req.setBiddingEndAt(now.plusSeconds(3));
         } else {
@@ -217,7 +242,6 @@ public class RequestServiceImpl implements RequestService {
         return saved;
     }
 
-
     @Override
     public ServiceRequest reject(Long id, String approverUsername, String reason) {
         ServiceRequest req = requestRepository.findById(id)
@@ -236,14 +260,11 @@ public class RequestServiceImpl implements RequestService {
         return saved;
     }
 
-    // ✅ PM can reactivate bidding after expiry
     @Override
     public ServiceRequest reactivateBidding(Long requestId) {
         ServiceRequest req = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found"));
 
-        // only owner PM should reactivate (optional but recommended)
-        // If you don't want auth logic here, remove this block.
         User current = getCurrentUser();
         if (current.getRole() != Role.PROJECT_MANAGER) {
             throw new RuntimeException("Only PROJECT_MANAGER can reactivate bidding");
@@ -252,14 +273,11 @@ public class RequestServiceImpl implements RequestService {
             throw new RuntimeException("You can only reactivate your own requests");
         }
 
-        // already active? return
         if (req.getBiddingActive() != null && req.getBiddingActive()) {
             return req;
         }
 
-        // ✅ IMPORTANT: if it was a demo request saved with 0 days, give it a real cycle on reactivation
-        // Choose ONE default:
-        int DEFAULT_REACTIVATION_DAYS = 7; // change to 3 if you want shorter reactivation window
+        int DEFAULT_REACTIVATION_DAYS = 7;
 
         if (req.getBiddingCycleDays() == null || req.getBiddingCycleDays() <= 0) {
             req.setBiddingCycleDays(DEFAULT_REACTIVATION_DAYS);
@@ -276,7 +294,6 @@ public class RequestServiceImpl implements RequestService {
 
         ServiceRequest saved = requestRepository.save(req);
 
-        // optional notification
         notificationService.sendToRole(
                 Role.RESOURCE_PLANNER,
                 "Bidding reactivated for request: " + req.getTitle()
@@ -296,7 +313,6 @@ public class RequestServiceImpl implements RequestService {
             throw new IllegalStateException("Bidding is not active for this request.");
         }
 
-        // ✅ FIX: Instant comparison
         if (request.getBiddingEndAt() != null && Instant.now().isAfter(request.getBiddingEndAt())) {
             request.setBiddingActive(false);
             request.setStatus(RequestStatus.EXPIRED);
@@ -362,24 +378,15 @@ public class RequestServiceImpl implements RequestService {
         ServiceRequest req = requestRepository.findById(id).orElse(null);
         if (req == null) return false;
 
-        // ✅ delete children first (avoid FK constraint errors)
-        try {
-            offerRepository.deleteByServiceRequestId(id);
-        } catch (Exception ignored) {}
+        try { offerRepository.deleteByServiceRequestId(id); } catch (Exception ignored) {}
+        try { orderRepository.deleteByServiceRequestId(id); } catch (Exception ignored) {}
 
-        try {
-            orderRepository.deleteByServiceRequestId(id);
-        } catch (Exception ignored) {}
-
-        // ✅ now delete the request itself
         requestRepository.deleteById(id);
 
-        // optional admin log / notification
         notificationService.sendToUsername("admin", "ADMIN deleted service request: " + req.getTitle() + " (#" + id + ")");
 
         return true;
     }
-
 
     @Override
     public ServiceOrder createServiceOrderFromOffer(Long offerId, String decidedBy) {
