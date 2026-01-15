@@ -19,7 +19,9 @@ export default function Sidebar() {
 
   const isActive = (path) => window.location.pathname === path;
 
-  // ✅ load unread notifications count (system + dm; separated in Notifications page)
+  // ✅ unread count = ONLY incoming unread:
+  // - SYSTEM: normal notifications
+  // - DIRECT_MESSAGE: only if I am the recipient
   const loadUnread = async () => {
     try {
       let endpoint = null;
@@ -33,7 +35,20 @@ export default function Sidebar() {
 
       const res = await API.get(endpoint);
       const data = res.data || [];
-      setUnreadCount(data.filter((n) => !n.read).length);
+
+      const incomingUnread = data.filter((n) => {
+        if (n.read) return false;
+
+        // DM: count only if I am the recipient (incoming)
+        if (n.category === "DIRECT_MESSAGE") {
+          return n.recipientUsername === username;
+        }
+
+        // SYSTEM: count it (it is for me)
+        return true;
+      });
+
+      setUnreadCount(incomingUnread.length);
     } catch (err) {
       console.error("Failed to load unread notifications", err);
       setUnreadCount(0);
@@ -90,15 +105,12 @@ export default function Sidebar() {
         flex-shrink-0
       "
     >
-      {/* ✅ internal padding wrapper */}
       <div className="p-6 flex flex-col h-full">
-        {/* Header */}
         <div className="mb-4">
           <h1 className="text-lg font-bold">Service Portal</h1>
           <p className="text-xs text-white/80 mt-1">{role}</p>
         </div>
 
-        {/* ✅ scrollable menu area (if sidebar grows) */}
         <div className="flex-1 overflow-y-auto pr-1">
           <div className="flex flex-col gap-3 text-sm font-medium">
             <NavItem icon={<FiHome />} label="Dashboard" path="/" />
@@ -122,7 +134,6 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="pt-4 mt-4 border-t border-white/20">
           <button
             onClick={logoutHandler}

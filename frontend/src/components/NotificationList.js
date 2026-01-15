@@ -41,12 +41,12 @@ export default function NotificationList({ notifications, onMarkAsRead }) {
               idx === notifications.length - 1 ? "mb-2" : ""
             }`}
           >
-            {/* Timeline Dot */}
+            {/* Timeline Dot (Unread = RED, Read = light) */}
             <span
               className={`w-3.5 h-3.5 rounded-full absolute -left-[10px] top-1.5 border-2 ${
                 n.read
                   ? "bg-white border-blue-300"
-                  : "bg-blue-600 border-blue-700 shadow-md"
+                  : "bg-red-500 border-red-600 shadow-[0_0_0_4px_rgba(239,68,68,0.20)]"
               }`}
             />
 
@@ -78,6 +78,7 @@ export default function NotificationList({ notifications, onMarkAsRead }) {
                     hover:bg-blue-700 hover:shadow-md
                     transition-all
                   "
+                  type="button"
                 >
                   <FiCheckCircle className="text-sm" />
                   Mark as read

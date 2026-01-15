@@ -20,10 +20,17 @@ export default function RequestDetails() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const role = localStorage.getItem("role"); // "PROCUREMENT_OFFICER", "PROJECT_MANAGER", etc.
+  const role = localStorage.getItem("role");
   const currentUsername = localStorage.getItem("username");
 
-  // ✅ KEEP YOUR EXISTING LOAD FUNCTION
+  // ✅ SR label helper (backend requestNumber preferred)
+  const srLabel = (req) => {
+    if (!req) return "-";
+    if (req.requestNumber && String(req.requestNumber).trim()) return req.requestNumber;
+    if (req.id == null) return "-";
+    return `SR-${String(req.id).padStart(6, "0")}`;
+  };
+
   const load = async () => {
     try {
       const [reqRes, offersRes] = await Promise.all([
@@ -82,47 +89,46 @@ export default function RequestDetails() {
   };
 
   const submitContactPm = async () => {
-  if (!request?.requestedByUsername) {
-    toast.error("This request has no Project Manager username.");
-    return;
-  }
-  if (!contactMessage.trim()) {
-    toast.error("Please write a message.");
-    return;
-  }
+    if (!request?.requestedByUsername) {
+      toast.error("This request has no Project Manager username.");
+      return;
+    }
+    if (!contactMessage.trim()) {
+      toast.error("Please write a message.");
+      return;
+    }
 
-  try {
-    const senderUsername = localStorage.getItem("username");
-    const senderRole = localStorage.getItem("role"); // PROCUREMENT_OFFICER
-    const recipientUsername = request.requestedByUsername;
-    const recipientRole = "PROJECT_MANAGER";
+    try {
+      const senderUsername = localStorage.getItem("username");
+      const senderRole = localStorage.getItem("role"); // PROCUREMENT_OFFICER
+      const recipientUsername = request.requestedByUsername;
+      const recipientRole = "PROJECT_MANAGER";
 
-    const users = [senderUsername, recipientUsername].sort();
-    const threadKey = `REQ-${request.id}:${users[0]}-${users[1]}`;
+      const users = [senderUsername, recipientUsername].sort();
+      const threadKey = `REQ-${request.id}:${users[0]}-${users[1]}`;
 
-    await API.post(
-      "/notifications/direct-message",   // ✅ FIXED URL
-      {
-        threadKey,
-        requestId: String(request.id),
-        senderUsername,
-        senderRole,
-        recipientUsername,
-        recipientRole,
-        message: `About request "${request.title}": ${contactMessage}`,
-      },
-      { headers: { "Content-Type": "application/json" } }
-    );
+      await API.post(
+        "/notifications/direct-message",
+        {
+          threadKey,
+          requestId: String(request.id),
+          senderUsername,
+          senderRole,
+          recipientUsername,
+          recipientRole,
+          message: `About ${srLabel(request)} "${request.title}": ${contactMessage}`,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
 
-    toast.success("Message sent to Project Manager (DM).");
-    setContactOpen(false);
-    setContactMessage("");
-  } catch (err) {
-    console.error("Failed to contact PM (DM)", err?.response || err);
-    toast.error("Failed to send DM to PM.");
-  }
-};
-
+      toast.success("Message sent to Project Manager (DM).");
+      setContactOpen(false);
+      setContactMessage("");
+    } catch (err) {
+      console.error("Failed to contact PM (DM)", err?.response || err);
+      toast.error("Failed to send DM to PM.");
+    }
+  };
 
   const approveRequest = async () => {
     try {
@@ -160,12 +166,11 @@ export default function RequestDetails() {
     }
   };
 
-  // ✅ FIX: Reactivate uses load() (NOT loadRequest)
   const reactivateBidding = async () => {
     try {
       await API.put(`/requests/${id}/reactivate`);
       toast.success("Bidding reactivated.");
-      load(); // ✅ was loadRequest() causing eslint error
+      load();
     } catch (err) {
       console.error("Failed to reactivate bidding", err?.response || err);
       toast.error("Failed to reactivate bidding.");
@@ -208,7 +213,6 @@ export default function RequestDetails() {
 
   const primaryRole = roles[0] || {};
 
-  // ✅ Reactivate button condition (ONLY ONE PLACE)
   const canReactivate =
     role === "PROJECT_MANAGER" &&
     request?.status === "EXPIRED" &&
@@ -253,7 +257,7 @@ export default function RequestDetails() {
             <div>
               <h1 className="text-3xl font-bold text-white">{request.title}</h1>
               <p className="text-white/80 text-xs mt-1">
-                Request ID: {request.id} • Requested by:{" "}
+                Request No: {srLabel(request)} • Internal ID: {request.id} • Requested by:{" "}
                 {request.requestedByUsername || "-"}
               </p>
             </div>
@@ -268,7 +272,6 @@ export default function RequestDetails() {
                 {request.status}
               </span>
 
-              {/* ✅ ONE proper Reactivate button (PM + owner + EXPIRED) */}
               {canReactivate && (
                 <button
                   onClick={reactivateBidding}
@@ -279,7 +282,6 @@ export default function RequestDetails() {
                 </button>
               )}
 
-              {/* ✅ Procurement action buttons on view page */}
               {role === "PROCUREMENT_OFFICER" && (
                 <>
                   <button
@@ -335,8 +337,7 @@ export default function RequestDetails() {
 
           {role === "PROCUREMENT_OFFICER" && !canProcurementAct && (
             <p className="text-white/80 text-xs mt-2">
-              Procurement actions are enabled only when the request is{" "}
-              <b>IN_REVIEW</b>.
+              Procurement actions are enabled only when the request is <b>IN_REVIEW</b>.
             </p>
           )}
         </div>
@@ -349,13 +350,14 @@ export default function RequestDetails() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <p>
+              <span className="font-semibold">Request No:</span> {srLabel(request)}
+            </p>
+            <p>
               <span className="font-semibold">Type:</span> {request.type}
             </p>
             <p>
               <span className="font-semibold">Project:</span>{" "}
-              {request.projectId
-                ? `${request.projectId} – ${request.projectName || ""}`
-                : "-"}
+              {request.projectId ? `${request.projectId} – ${request.projectName || ""}` : "-"}
             </p>
             <p>
               <span className="font-semibold">Contract:</span>{" "}
@@ -364,8 +366,8 @@ export default function RequestDetails() {
                 : "-"}
             </p>
             <p>
-              <span className="font-semibold">Dates:</span>{" "}
-              {request.startDate || "-"} → {request.endDate || "-"}
+              <span className="font-semibold">Dates:</span> {request.startDate || "-"} →{" "}
+              {request.endDate || "-"}
             </p>
 
             <p>
@@ -377,8 +379,8 @@ export default function RequestDetails() {
             </p>
 
             <p>
-              <span className="font-semibold">Man days / Onsite:</span>{" "}
-              {totalManDays} / {totalOnsiteDays}
+              <span className="font-semibold">Man days / Onsite:</span> {totalManDays} /{" "}
+              {totalOnsiteDays}
             </p>
             <p>
               <span className="font-semibold">Bidding cycle (days):</span>{" "}
@@ -391,8 +393,7 @@ export default function RequestDetails() {
               {primaryRole.domain || "-"}
             </p>
             <p>
-              <span className="font-semibold">Primary Role:</span>{" "}
-              {primaryRole.roleName || "-"}
+              <span className="font-semibold">Primary Role:</span> {primaryRole.roleName || "-"}
             </p>
             <p>
               <span className="font-semibold">Primary Technology:</span>{" "}
@@ -419,8 +420,7 @@ export default function RequestDetails() {
             </p>
             {request.taskDescription && (
               <p>
-                <span className="font-semibold">Task:</span>{" "}
-                {request.taskDescription}
+                <span className="font-semibold">Task:</span> {request.taskDescription}
               </p>
             )}
             {request.furtherInformation && (
@@ -462,7 +462,7 @@ export default function RequestDetails() {
           )}
         </div>
 
-        {/* OFFERS SECTION (PM functions) */}
+        {/* OFFERS SECTION */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold text-white">Offers</h2>
         </div>
@@ -477,9 +477,7 @@ export default function RequestDetails() {
                 className="p-4 border border-gray-200 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:bg-gray-50 transition"
               >
                 <div>
-                  <p className="text-lg font-semibold text-gray-800">
-                    {o.specialistName}
-                  </p>
+                  <p className="text-lg font-semibold text-gray-800">{o.specialistName}</p>
                   <p className="text-xs text-gray-600">
                     Daily rate: {o.dailyRate} € — Total: {o.totalCost} €
                   </p>
@@ -488,7 +486,6 @@ export default function RequestDetails() {
                   </p>
                 </div>
 
-                {/* Keep PM buttons if you want them for PM only */}
                 {role === "PROJECT_MANAGER" && (
                   <div className="flex items-center gap-2">
                     <button
@@ -512,7 +509,7 @@ export default function RequestDetails() {
           </div>
         </div>
 
-        {/* ✅ Contact PM modal */}
+        {/* Contact PM modal */}
         {contactOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
             <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
@@ -520,7 +517,7 @@ export default function RequestDetails() {
                 Contact Project Manager
               </h3>
               <p className="text-xs text-slate-600 mb-2">
-                Request: <span className="font-semibold">{request.title}</span>
+                Request: <span className="font-semibold">{srLabel(request)} — {request.title}</span>
               </p>
               <textarea
                 value={contactMessage}
@@ -549,7 +546,7 @@ export default function RequestDetails() {
           </div>
         )}
 
-        {/* ✅ Reject modal */}
+        {/* Reject modal */}
         {rejectOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
             <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
@@ -557,7 +554,7 @@ export default function RequestDetails() {
                 Reject Service Request
               </h3>
               <p className="text-xs text-slate-600 mb-2">
-                Request: <span className="font-semibold">{request.title}</span>
+                Request: <span className="font-semibold">{srLabel(request)} — {request.title}</span>
               </p>
               <textarea
                 value={rejectReason}

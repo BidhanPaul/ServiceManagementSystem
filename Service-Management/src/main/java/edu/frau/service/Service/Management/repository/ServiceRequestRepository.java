@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, Long> {
 
+    boolean existsByRequestNumber(String requestNumber);
+
     List<ServiceRequest> findByRequestedByUsername(String username);
 
     List<ServiceRequest> findByStatus(RequestStatus status);

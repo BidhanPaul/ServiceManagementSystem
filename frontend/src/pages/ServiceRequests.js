@@ -135,6 +135,14 @@ export default function ServiceRequests() {
   // --------------------------- HELPERS ---------------------------
   const numOrNull = (v) => (v === "" ? null : Number(v));
 
+  // ✅ SR label helper (backend requestNumber preferred)
+  const srLabel = (req) => {
+    if (!req) return "-";
+    if (req.requestNumber && String(req.requestNumber).trim()) return req.requestNumber;
+    if (req.id == null) return "-";
+    return `SR-${String(req.id).padStart(6, "0")}`;
+  };
+
   const getTechnologyOptionsFromContractRole = (cr) => {
     if (!cr) return [];
     const candidates = [
@@ -336,7 +344,7 @@ export default function ServiceRequests() {
     );
     setSelectedProject(proj || null);
 
-    titleTouchedRef.current = true; // keep title as user has it
+    titleTouchedRef.current = true;
 
     setForm({
       title: req.title || "",
@@ -368,7 +376,9 @@ export default function ServiceRequests() {
       furtherInformation: req.furtherInformation || "",
     });
 
-    const reqRoles = Array.isArray(req.roles) && req.roles.length > 0 ? req.roles : [emptyRoleRow()];
+    const reqRoles =
+      Array.isArray(req.roles) && req.roles.length > 0 ? req.roles : [emptyRoleRow()];
+
     setRoles(
       reqRoles.map((r) => ({
         selectedContractRole: r.roleName || "",
@@ -740,7 +750,9 @@ export default function ServiceRequests() {
                           <label className="text-[11px] text-gray-500">Technology</label>
                           <select
                             value={r.technology}
-                            onChange={(e) => handleRoleFieldChange(index, "technology", e.target.value)}
+                            onChange={(e) =>
+                              handleRoleFieldChange(index, "technology", e.target.value)
+                            }
                             className="w-full border rounded-lg px-2 py-2 text-sm"
                             disabled={!r.selectedContractRole}
                           >
@@ -906,9 +918,10 @@ export default function ServiceRequests() {
             <p className="text-white/80">Loading...</p>
           ) : (
             <div className="bg-white/90 rounded-2xl shadow-lg p-4 overflow-x-auto">
-              <table className="min-w-[900px] w-full text-sm">
+              <table className="min-w-[1000px] w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b">
+                    <th className="py-2">Request No</th>
                     <th className="py-2">Title</th>
                     <th className="py-2">Type</th>
                     <th className="py-2">Status</th>
@@ -922,6 +935,10 @@ export default function ServiceRequests() {
                 <tbody>
                   {requests.map((r) => (
                     <tr key={r.id} className="border-b last:border-0">
+                      <td className="py-2 font-semibold text-slate-800">
+                        {srLabel(r)}
+                      </td>
+
                       <td className="py-2">{r.title}</td>
                       <td className="py-2">{r.type}</td>
                       <td className="py-2">
@@ -976,7 +993,7 @@ export default function ServiceRequests() {
 
                   {requests.length === 0 && (
                     <tr>
-                      <td className="text-center py-4 text-gray-500" colSpan={7}>
+                      <td className="text-center py-4 text-gray-500" colSpan={8}>
                         No requests yet.
                       </td>
                     </tr>

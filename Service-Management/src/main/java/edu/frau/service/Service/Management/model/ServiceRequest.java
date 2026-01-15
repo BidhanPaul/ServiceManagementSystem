@@ -13,6 +13,9 @@ public class ServiceRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, nullable = false, updatable = false)
+    private String requestNumber;
+
     private String title;
 
     @Enumerated(EnumType.STRING)
@@ -49,6 +52,7 @@ public class ServiceRequest {
     @Column(length = 2000)
     private String taskDescription;
 
+
     @Column(length = 2000)
     private String furtherInformation;
 
@@ -75,6 +79,10 @@ public class ServiceRequest {
 
     // ---- getters/setters ----
     public Long getId() { return id; }
+
+    public String getRequestNumber() { return requestNumber; }
+    public void setRequestNumber(String requestNumber) { this.requestNumber = requestNumber; }
+
     public void setId(Long id) { this.id = id; }
 
     public String getTitle() { return title; }
