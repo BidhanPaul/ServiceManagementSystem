@@ -23,10 +23,17 @@ public class MessageServiceImpl implements MessageService {
     public Message sendMessage(Message msg) {
         Message saved = messageRepository.save(msg);
 
-        // ALSO create a notification for recipient (so it appears in Notifications page)
-        notificationService.sendToUsername(
+        // ✅ IMPORTANT FIX:
+        // Instead of creating a SYSTEM notification like "DM from ...",
+        // create a real DIRECT_MESSAGE notification so the Notifications.js DM logic works.
+        notificationService.sendDirectMessage(
+                msg.getThreadKey(),
+                msg.getRequestId() != null ? String.valueOf(msg.getRequestId()) : null,
+                msg.getSenderUsername(),
+                msg.getSenderRole(),
                 msg.getRecipientUsername(),
-                "DM from " + msg.getSenderUsername() + " (Req " + (msg.getRequestId() != null ? msg.getRequestId() : "-") + "): " + msg.getMessage()
+                msg.getRecipientRole(),
+                msg.getMessage()
         );
 
         return saved;

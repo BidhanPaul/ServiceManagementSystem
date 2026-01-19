@@ -63,49 +63,25 @@ public class NotificationServiceImpl implements NotificationService {
             Role recipientRole,
             String message
     ) {
-        // 1) Recipient copy
-        Notification toRecipient = new Notification();
-        toRecipient.setCategory(NotificationCategory.DIRECT_MESSAGE);
+        // ✅ Save ONE real message only (no fake sender copy)
+        Notification n = new Notification();
+        n.setCategory(NotificationCategory.DIRECT_MESSAGE);
 
-        toRecipient.setThreadKey(threadKey);
-        toRecipient.setRequestId(requestId);
+        n.setThreadKey(threadKey);
+        n.setRequestId(requestId);
 
-        toRecipient.setSenderUsername(senderUsername);
-        toRecipient.setSenderRole(senderRole);
+        n.setSenderUsername(senderUsername);
+        n.setSenderRole(senderRole);
 
-        toRecipient.setRecipientUsername(recipientUsername);
-        toRecipient.setRecipientRole(recipientRole);
+        n.setRecipientUsername(recipientUsername);
+        n.setRecipientRole(recipientRole);
 
-        toRecipient.setMessage(message);
-        toRecipient.setSentAt(Instant.now());
-        toRecipient.setRead(false);
+        n.setMessage(message);
+        n.setSentAt(Instant.now());
+        n.setRead(false); // read status belongs to recipient
 
-        notificationRepository.save(toRecipient);
-
-        // 2) Sender copy (so sender also sees it in their own DM thread)
-        Notification toSender = new Notification();
-        toSender.setCategory(NotificationCategory.DIRECT_MESSAGE);
-
-        toSender.setThreadKey(threadKey);
-        toSender.setRequestId(requestId);
-
-        toSender.setSenderUsername(senderUsername);
-        toSender.setSenderRole(senderRole);
-
-        // ✅ store to sender inbox
-        toSender.setRecipientUsername(senderUsername);
-        toSender.setRecipientRole(senderRole);
-
-        toSender.setMessage(message);
-        toSender.setSentAt(Instant.now());
-        toSender.setRead(true); // optional: sender copy can be auto-read
-
-        notificationRepository.save(toSender);
-
-        // return the recipient copy (or sender copy, doesn't matter)
-        return toRecipient;
+        return notificationRepository.save(n);
     }
-
 
     // ---------------- GETTERS ----------------
 
@@ -114,15 +90,33 @@ public class NotificationServiceImpl implements NotificationService {
         User user = userRepository.findByUsername(username).orElse(null);
         if (user == null) return List.of();
 
-        return notificationRepository.findUserFeed(username, user.getRole());
-    }
+        List<Notification> feed = notificationRepository.findUserFeed(username, user.getRole());
 
+        /**
+         * ✅ IMPORTANT FIX:
+         * Outgoing DMs (senderUsername == current user) should NOT behave like unread notifications for the sender.
+         * Otherwise:
+         *  - Sidebar badge counts outgoing as unread
+         *  - "Mark as read" on recipient side changes sender view too
+         *
+         * So we force outgoing DM rows to be returned as read=true for the sender (response-only).
+         */
+        for (Notification n : feed) {
+            if (n.getCategory() == NotificationCategory.DIRECT_MESSAGE
+                    && username != null
+                    && username.equals(n.getSenderUsername())
+                    && (n.getRecipientUsername() == null || !username.equals(n.getRecipientUsername()))) {
+                n.setRead(true); // response-only (not saving)
+            }
+        }
+
+        return feed;
+    }
 
     @Override
     public List<Notification> getNotificationsForUser(String username, NotificationCategory category) {
         return notificationRepository.findByRecipientUsernameAndCategoryOrderBySentAtDesc(username, category);
     }
-
 
     @Override
     public List<Notification> getNotificationsForRole(String roleName) {

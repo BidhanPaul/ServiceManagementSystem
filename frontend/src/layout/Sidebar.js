@@ -8,9 +8,32 @@ import API from "../api/api";
 export default function Sidebar() {
   const navigate = useNavigate();
   const role = getUserRole();
+<<<<<<< HEAD
   const username = localStorage.getItem("username");
 
   const [unreadCount, setUnreadCount] = useState(0);
+=======
+<<<<<<< HEAD
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await API.get("/notifications/admin");
+      const unread = response.data?.filter((n) => !n.read)?.length || 0;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error("Failed to load notifications", error);
+    }
+  };
+=======
+  const username = localStorage.getItem("username");
+
+  const [unreadCount, setUnreadCount] = useState(0);
+>>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
 
   const handleLogout = () => {
     removeToken();
@@ -19,7 +42,9 @@ export default function Sidebar() {
 
   const isActive = (path) => window.location.pathname === path;
 
-  // ✅ load unread notifications count (system + dm; separated in Notifications page)
+  // ✅ unread count = ONLY incoming unread:
+  // - SYSTEM: normal notifications
+  // - DIRECT_MESSAGE: only if I am the recipient
   const loadUnread = async () => {
     try {
       let endpoint = null;
@@ -33,7 +58,20 @@ export default function Sidebar() {
 
       const res = await API.get(endpoint);
       const data = res.data || [];
-      setUnreadCount(data.filter((n) => !n.read).length);
+
+      const incomingUnread = data.filter((n) => {
+        if (n.read) return false;
+
+        // DM: count only if I am the recipient (incoming)
+        if (n.category === "DIRECT_MESSAGE") {
+          return n.recipientUsername === username;
+        }
+
+        // SYSTEM: count it (it is for me)
+        return true;
+      });
+
+      setUnreadCount(incomingUnread.length);
     } catch (err) {
       console.error("Failed to load unread notifications", err);
       setUnreadCount(0);
@@ -71,6 +109,62 @@ export default function Sidebar() {
         {label}
       </span>
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+      <div className="flex flex-col gap-4 text-sm font-medium">
+        {/* Dashboard */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-3 hover:text-gray-200"
+        >
+          <FiHome /> Dashboard
+        </button>
+
+        {/* Manage Users — ONLY ADMIN */}
+        {role === "ADMIN" && (
+          <button
+            onClick={() => navigate("/admin/users")}
+            className="flex items-center gap-3 hover:text-gray-200"
+          >
+            <FiUsers /> Manage Users
+          </button>
+        )}
+
+        {/* Notifications */}
+        <button
+          onClick={() => navigate("/notifications")}
+          className="flex items-center gap-3 hover:text-gray-200 relative"
+        >
+          <FiBell /> Notifications
+          {unreadCount > 0 && (
+            <span className="ml-auto bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Settings */}
+        <button
+          onClick={() => navigate("/settings")}
+          className="flex items-center gap-3 hover:text-gray-200"
+        >
+          <FiSettings /> Settings
+        </button>
+      </div>
+
+      {/* Logout Button */}
+      <div className="mt-auto">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 text-red-100 hover:text-red-300"
+        >
+          <FiLogOut /> Logout
+        </button>
+      </div>
+    </div>
+=======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
       {showBadge && unreadCount > 0 && (
         <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md">
           {unreadCount}
@@ -90,15 +184,12 @@ export default function Sidebar() {
         flex-shrink-0
       "
     >
-      {/* ✅ internal padding wrapper */}
       <div className="p-6 flex flex-col h-full">
-        {/* Header */}
         <div className="mb-4">
           <h1 className="text-lg font-bold">Service Portal</h1>
           <p className="text-xs text-white/80 mt-1">{role}</p>
         </div>
 
-        {/* ✅ scrollable menu area (if sidebar grows) */}
         <div className="flex-1 overflow-y-auto pr-1">
           <div className="flex flex-col gap-3 text-sm font-medium">
             <NavItem icon={<FiHome />} label="Dashboard" path="/" />
@@ -122,7 +213,6 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="pt-4 mt-4 border-t border-white/20">
           <button
             onClick={logoutHandler}
@@ -135,5 +225,9 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+<<<<<<< HEAD
+=======
+>>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
   );
 }

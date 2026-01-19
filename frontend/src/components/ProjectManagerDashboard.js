@@ -571,6 +571,156 @@ const contractLabel = (req) => {
                             key={r.id}
                             className="hover:bg-slate-50/60 transition-colors"
                           >
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+                            {req.status}
+                          </span>
+                        </div>
+
+                        {/* Offers for my requests (compact overview, like before) */}
+                        <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                                Offers for My Requests
+                              </h2>
+                              <p className="text-xs text-slate-500">
+                                Quick view of offers that suppliers have submitted for
+                                your service requests.
+                              </p>
+                            </div>
+                          </div>
+                          {myRequests.length === 0 ? (
+                            <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                              You have no requests, so there are no offers yet.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {myRequests.map((req) => {
+                                const offers = offersByRequestId[req.id] || [];
+                                return (
+                                  <div
+                                    key={req.id}
+                                    className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
+                                  >
+                                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
+                                      <div>
+                                        <p className="font-semibold text-slate-900 text-sm">
+                                          {req.title}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500">
+                                          {projectLabel(req)} • {contractLabel(req)}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={
+                                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
+                                            statusBadgeClass(req.status)
+                                          }
+                                          ></span>
+
+
+
+
+
+
+
+                        {/* Offers modal */}
+                        {offerModalOpen && offerModalRequest && (
+                          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
+                            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-lg border border-slate-100">
+                              <h3 className="text-lg font-semibold mb-2 text-slate-900">
+                                Offers for "{offerModalRequest.title}"
+                              </h3>
+                              <p className="text-xs text-slate-600 mb-3">
+                                Project: {projectLabel(offerModalRequest)} • Contract:{" "}
+                                {contractLabel(offerModalRequest)}
+                              </p>
+                              {(() => {
+                              const offers =
+                                offersByRequestId[offerModalRequest.id] || [];
+                              if (offers.length === 0) {
+                                return (
+                                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-3 py-4 text-center">
+                                    No offers have been submitted yet for this request.
+                                  </p>
+                                );
+                              }
+                              return (
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                {offers.map((o) => (
+                                  <div
+                                    key={o.id}
+                                    className="border border-slate-200 rounded-xl p-2.5 text-xs flex justify-between gap-3"
+                                  >
+                                    <div>
+                                      <p className="font-semibold text-slate-900">
+                                        {o.specialistName || "Unnamed Specialist"}
+                                      </p>
+                                      <p className="text-slate-600">
+                                        Supplier: {o.supplierName} (
+                                        {o.contractualRelationship})
+                                      </p>
+                                      {o.notes && (
+                                        <p className="text-slate-500 mt-0.5">
+                                          Notes: {o.notes}
+                                        </p>
+                                      )}
+                                                </div>
+                                    <div className="text-right">
+                                      <p className="text-slate-700">
+                                        Daily rate:{" "}
+                                        <span className="font-semibold">
+                                          {o.dailyRate} €
+                                        </span>
+                                      </p>
+                                      <p className="text-slate-900 font-semibold">
+                                        Total: {o.totalCost} €
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                          
+
+
+
+
+
+                        {offers.length === 0 ? (
+                          <p className="text-xs text-gray-500">
+                            No offers received yet.
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            {offers.map((o) => (
+                              <div
+                                key={o.id}
+                                className="flex justify-between text-xs border-t pt-1 mt-1"
+                              >
+                                <div>
+                                  <p className="font-semibold text-gray-700">
+                                    {o.specialistName || "Unnamed Specialist"}
+                                  </p>
+                                  <p className="text-gray-500">
+                                    Supplier: {o.supplierName} (
+                                    {o.contractualRelationship})
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-gray-600">
+                                    Daily rate: {o.dailyRate} €
+                                  </p>
+                                  <p className="font-semibold text-gray-800">
+                                    Total: {o.totalCost} €
+                                  </p>
+                                </div>
+=======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
                             <td className="py-2.5 px-3 align-middle">
                               <div className="flex flex-col">
                                 <span className="font-medium text-slate-900 text-sm">
@@ -579,6 +729,10 @@ const contractLabel = (req) => {
                                 <span className="text-[11px] text-slate-500">
                                   {r.roles?.length || 0} role(s)
                                 </span>
+<<<<<<< HEAD
+=======
+>>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
                               </div>
                             </td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">

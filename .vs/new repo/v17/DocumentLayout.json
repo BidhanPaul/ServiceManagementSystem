@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\NotificationList.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\components\\NotificationList.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ServiceProviderDashboard.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\components\\ServiceProviderDashboard.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
     },
@@ -55,6 +59,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "NotificationList.js",
+              "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\NotificationList.js",
+              "RelativeDocumentMoniker": "frontend\\src\\components\\NotificationList.js",
+              "ToolTip": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\NotificationList.js",
+              "RelativeToolTip": "frontend\\src\\components\\NotificationList.js",
+              "ViewState": "AgIAAEkAAAAAAAAAAAAswHYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-01-04T18:36:19.267Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "ServiceProviderDashboard.js",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ServiceProviderDashboard.js",
               "RelativeDocumentMoniker": "frontend\\src\\components\\ServiceProviderDashboard.js",
@@ -67,7 +84,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "ProcurementDashboard.js",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\components\\ProcurementDashboard.js",
               "RelativeDocumentMoniker": "frontend\\src\\components\\ProcurementDashboard.js",
@@ -75,12 +92,11 @@
               "RelativeToolTip": "frontend\\src\\components\\ProcurementDashboard.js",
               "ViewState": "AgIAAHUAAAAAAAAAAAAswIEAAAA7AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2026-01-03T00:05:01.702Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-01-03T00:05:01.702Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "Notifications.js",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\src\\pages\\Notifications.js",
               "RelativeDocumentMoniker": "frontend\\src\\pages\\Notifications.js",
@@ -92,7 +108,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "index.html",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\frontend\\public\\index.html",
               "RelativeDocumentMoniker": "frontend\\public\\index.html",
@@ -104,7 +120,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "README.md",
               "DocumentMoniker": "D:\\frankfurt Docs\\Sem 3\\Agile\\new repo\\README.md",
               "RelativeDocumentMoniker": "README.md",
