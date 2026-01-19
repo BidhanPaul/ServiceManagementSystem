@@ -37,4 +37,10 @@ public interface RequestService {
 
     // ✅ NEW
     ServiceRequest reactivateBidding(Long requestId);
+
+    void pullProviderOffers(Long requestId);
+
+    ServiceOrder finalApproveAndCreateOrder(Long offerId);
+
+
 }

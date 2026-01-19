@@ -9,6 +9,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import edu.frau.service.Service.Management.integration.provider.ProviderManagementClient;
+import edu.frau.service.Service.Management.integration.provider.ProviderOfferDTO;
+import java.util.stream.Collectors;
+import java.time.Instant;
+import edu.frau.service.Service.Management.model.OrderStatus;
+
+
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -33,6 +40,10 @@ public class RequestServiceImpl implements RequestService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ProviderManagementClient providerClient;
+
 
     // ---------- helpers ----------
 
@@ -389,6 +400,139 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
+    public void pullProviderOffers(Long requestId) {
+        ServiceRequest req = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+        ensureBiddingFields(req);
+
+        // Must be eligible for bidding
+        if (req.getBiddingActive() == null || !req.getBiddingActive()) {
+            throw new IllegalStateException("Bidding is not active for this request.");
+        }
+
+        // If expired, stop bidding
+        if (req.getBiddingEndAt() != null && Instant.now().isAfter(req.getBiddingEndAt())) {
+            req.setBiddingActive(false);
+            req.setStatus(RequestStatus.EXPIRED);
+            requestRepository.save(req);
+            throw new IllegalStateException("Bidding window expired.");
+        }
+
+        // Group-4 offer.requestId must match your requestNumber (SR-XXXX)
+        String externalRequestId = req.getRequestNumber();
+
+        List<ProviderOfferDTO> externalOffers = providerClient.fetchAllOffers();
+        if (externalOffers == null || externalOffers.isEmpty()) return;
+
+        List<ProviderOfferDTO> matches = externalOffers.stream()
+                .filter(o -> o != null && externalRequestId != null && externalRequestId.equals(o.requestId))
+                .collect(Collectors.toList());
+
+        if (matches.isEmpty()) return;
+
+        // Load existing offers once (for duplicate prevention)
+        List<ServiceOffer> existing = offerRepository.findByServiceRequestId(req.getId());
+
+        int inserted = 0;
+        for (ProviderOfferDTO ext : matches) {
+            ServiceOffer offer = mapProviderOfferToServiceOffer(req, ext);
+
+            boolean duplicate = existing.stream().anyMatch(e ->
+                    safeEq(e.getSupplierName(), offer.getSupplierName())
+                            && safeEq(e.getSpecialistName(), offer.getSpecialistName())
+                            && Double.compare(e.getDailyRate(), offer.getDailyRate()) == 0
+            );
+
+            if (!duplicate) {
+                offerRepository.save(offer);
+                inserted++;
+            }
+        }
+
+        // If first offers arrived, move into BIDDING
+        if (inserted > 0 && req.getStatus() == RequestStatus.APPROVED_FOR_BIDDING) {
+            req.setStatus(RequestStatus.BIDDING);
+            requestRepository.save(req);
+        }
+
+        // Notify PM + RP that offers arrived (optional but looks professional)
+        notificationService.sendToUsername(
+                req.getRequestedByUsername(),
+                "Provider offers pulled for request: " + req.getTitle() + " (+" + inserted + ")"
+        );
+        notificationService.sendToRole(
+                Role.RESOURCE_PLANNER,
+                "Provider offers pulled for request: " + req.getTitle() + " (+" + inserted + ")"
+        );
+    }
+
+    private boolean safeEq(String a, String b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.trim().equalsIgnoreCase(b.trim());
+    }
+
+    private ServiceOffer mapProviderOfferToServiceOffer(ServiceRequest req, ProviderOfferDTO ext) {
+        ServiceOffer offer = new ServiceOffer();
+        offer.setServiceRequest(req);
+
+        // Supplier fields (your DB has these)
+        offer.setSupplierName(ext.supplierName != null ? ext.supplierName : "Unknown Supplier");
+        offer.setSupplierRepresentative("Provider Portal"); // can be overwritten later
+
+        ProviderOfferDTO.Candidate c = null;
+        Integer onsiteDays = 0;
+
+        if (ext.response != null && ext.response.delivery != null && ext.response.delivery.proposedOnsiteDays != null) {
+            onsiteDays = ext.response.delivery.proposedOnsiteDays;
+        }
+
+        if (ext.response != null && ext.response.staffing != null
+                && ext.response.staffing.candidates != null && !ext.response.staffing.candidates.isEmpty()) {
+            c = ext.response.staffing.candidates.get(0);
+        }
+
+        if (c != null) {
+            // Your ServiceOffer model does not store specialistEmail, so we store name/id
+            offer.setSpecialistName(c.specialistId != null ? c.specialistId : "Unknown Specialist");
+            offer.setMaterialNumber(c.materialNumber);
+
+            offer.setContractualRelationship(c.contractualRelationship);
+            offer.setSubcontractorCompany(c.subcontractorCompany);
+
+            double dailyRate = c.dailyRate != null ? c.dailyRate : 0.0;
+            offer.setDailyRate(dailyRate);
+
+            double travel = c.travelCostPerOnsiteDay != null ? c.travelCostPerOnsiteDay : 0.0;
+            offer.setTravellingCost(travel * onsiteDays);
+        } else {
+            offer.setSpecialistName("Unknown Specialist");
+            offer.setDailyRate(0.0);
+            offer.setTravellingCost(0.0);
+        }
+
+        // Calculate man-days from your request roles (same logic you use for ServiceOrder)
+        int totalManDays = 0;
+        if (req.getRoles() != null) {
+            totalManDays = req.getRoles().stream()
+                    .map(r -> r.getManDays() != null ? r.getManDays() : 0)
+                    .reduce(0, Integer::sum);
+        }
+
+        // Total cost (consistent & demo-ready)
+        offer.setTotalCost(offer.getDailyRate() * totalManDays + offer.getTravellingCost());
+
+        // Matching flags (you can refine later)
+        offer.setMatchMustHaveCriteria(true);
+        offer.setMatchNiceToHaveCriteria(true);
+        offer.setMatchLanguageSkills(true);
+
+        return offer;
+    }
+
+
+    @Override
     public ServiceOrder createServiceOrderFromOffer(Long offerId, String decidedBy) {
         ServiceOffer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new IllegalArgumentException("Offer not found"));
@@ -396,6 +540,10 @@ public class RequestServiceImpl implements RequestService {
         ServiceRequest req = offer.getServiceRequest();
 
         ServiceOrder order = new ServiceOrder();
+        order.setSelectedOffer(offer);
+        order.setStatus(OrderStatus.PENDING_RP_APPROVAL);
+        order.setCreatedAt(Instant.now());
+        order.setCreatedBy(decidedBy);
         order.setTitle(req.getTitle());
         order.setServiceRequestReference(req);
         order.setStartDate(req.getStartDate());
@@ -423,9 +571,11 @@ public class RequestServiceImpl implements RequestService {
 
         ServiceOrder savedOrder = orderRepository.save(order);
 
-        req.setStatus(RequestStatus.ORDERED);
+
+        req.setStatus(RequestStatus.EVALUATION);
         req.setBiddingActive(false);
         requestRepository.save(req);
+
 
         notificationService.sendToUsername(
                 req.getRequestedByUsername(),
@@ -434,4 +584,39 @@ public class RequestServiceImpl implements RequestService {
 
         return savedOrder;
     }
+    @Override
+    public ServiceOrder finalApproveAndCreateOrder(Long offerId) {
+        User current = getCurrentUser();
+        if (current.getRole() != Role.RESOURCE_PLANNER) {
+            throw new RuntimeException("Only RESOURCE_PLANNER can final approve and create service order.");
+        }
+
+        ServiceOffer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new IllegalArgumentException("Offer not found"));
+
+        ServiceRequest req = offer.getServiceRequest();
+
+        // ✅ Must have a preferred offer selected first (PM step)
+        if (req.getPreferredOfferId() == null) {
+            throw new IllegalStateException("Preferred offer must be selected by PM before final approval.");
+        }
+        if (!req.getPreferredOfferId().equals(offer.getId())) {
+            throw new IllegalStateException("Only the preferred offer can be final approved.");
+        }
+
+        // ✅ Only allow final approve in correct stages
+        if (req.getStatus() != RequestStatus.EVALUATION && req.getStatus() != RequestStatus.BIDDING) {
+            throw new IllegalStateException("Final approval allowed only in EVALUATION/BIDDING stage.");
+        }
+
+        ServiceOrder order = createServiceOrderFromOffer(offerId, current.getUsername());
+
+        notificationService.sendToUsername(
+                req.getRequestedByUsername(),
+                "Resource Planner final approved and created order for: " + req.getTitle()
+        );
+
+        return order;
+    }
+
 }

@@ -30,5 +30,3 @@ public class AdminDashboardController {
         return stats;
     }
 }
-
-

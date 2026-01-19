@@ -12,6 +12,9 @@ import Notifications from "./pages/Notifications";
 import ServiceRequests from "./pages/ServiceRequests";
 import RequestDetails from "./pages/RequestDetails";
 import Settings from "./pages/Settings";
+import OrdersList from "./pages/OrdersList";
+import OrderDetails from "./pages/OrderDetails";
+
 
 
 
@@ -28,7 +31,10 @@ function App() {
         <Route path="/service-offers" element={<PrivateRoute><ServiceOfferList /></PrivateRoute>} />
         <Route path="/create-service-offer" element={<PrivateRoute role="ADMIN"><ServiceOfferForm /></PrivateRoute>} />
         <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-         <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="/orders" element={<PrivateRoute><OrdersList /></PrivateRoute>} />
+        <Route path="/orders/:id" element={<PrivateRoute><OrderDetails /></PrivateRoute>} />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

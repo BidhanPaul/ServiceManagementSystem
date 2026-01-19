@@ -1,6 +1,5 @@
 // src/pages/Login.js
-
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { FiUser, FiLock, FiArrowRight } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -14,7 +13,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const isFormValid = username && password;
+  const isFormValid = useMemo(() => !!(username && password), [username, password]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -53,27 +52,35 @@ const Login = () => {
 
   return (
     <AuthLayout
-      title="Welcome Back"
-      subtitle="Sign in to access your dashboard and continue your work."
+      title="Welcome back"
+      subtitle="Sign in to continue to the Service Portal."
     >
-      <h2 className="text-3xl font-bold text-center text-blue-700 mb-8">
-        Login
-      </h2>
+      {/* Title */}
+      <div className="mb-6">
+        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-center">
+          Sign in
+        </h2>
+        <p className="text-center text-sm text-slate-600 mt-1">
+          Use your work account credentials.
+        </p>
+      </div>
 
-      <form onSubmit={handleLogin} className="space-y-6">
-
+      {/* Form */}
+      <form onSubmit={handleLogin} className="space-y-4">
         {/* Username */}
         <div className="relative">
-          <FiUser className="absolute left-4 top-3.5 text-gray-600 text-lg z-10 pointer-events-none" />
+          <FiUser className="absolute left-4 top-3.5 text-slate-500 text-lg z-10 pointer-events-none" />
           <input
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
             className="
-              w-full rounded-xl bg-white/60 backdrop-blur-md
-              border border-white/60 px-12 py-3 shadow-sm
-              focus:ring-2 focus:ring-blue-300 focus:border-blue-400
-              placeholder-gray-500 text-gray-800 outline-none transition
+              w-full rounded-2xl bg-white/80 backdrop-blur-xl
+              border border-slate-200 px-12 py-3
+              shadow-sm
+              focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300
+              placeholder-slate-400 text-slate-900 outline-none transition
             "
             required
           />
@@ -81,43 +88,64 @@ const Login = () => {
 
         {/* Password */}
         <div className="relative">
-          <FiLock className="absolute left-4 top-3.5 text-gray-600 text-lg z-10 pointer-events-none" />
+          <FiLock className="absolute left-4 top-3.5 text-slate-500 text-lg z-10 pointer-events-none" />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             className="
-              w-full rounded-xl bg-white/60 backdrop-blur-md
-              border border-white/60 px-12 py-3 shadow-sm
-              focus:ring-2 focus:ring-blue-300 focus:border-blue-400
-              placeholder-gray-500 text-gray-800 outline-none transition
+              w-full rounded-2xl bg-white/80 backdrop-blur-xl
+              border border-slate-200 px-12 py-3
+              shadow-sm
+              focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300
+              placeholder-slate-400 text-slate-900 outline-none transition
             "
             required
           />
         </div>
 
-        {/* Submit Button */}
+        {/* Submit */}
         <button
           type="submit"
           disabled={!isFormValid || loading}
-          className={`w-full py-3 rounded-xl font-semibold text-white shadow-lg flex items-center justify-center gap-2
-            transition-all ${
-              isFormValid && !loading
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-gray-300 cursor-not-allowed"
-            }`}
+          className={
+            "w-full py-3 rounded-2xl font-semibold text-white shadow-sm " +
+            "flex items-center justify-center gap-2 transition " +
+            (isFormValid && !loading
+              ? "bg-slate-900 hover:bg-slate-800"
+              : "bg-slate-300 cursor-not-allowed")
+          }
         >
-          {loading ? "Processing..." : "Login"} {!loading && <FiArrowRight />}
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-white/60 border-t-white animate-spin" />
+              Processing...
+            </span>
+          ) : (
+            <>
+              Login <FiArrowRight />
+            </>
+          )}
         </button>
       </form>
 
-      {/* Redirect link */}
-      <p className="text-center mt-6 text-gray-700">
+      {/* Divider */}
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs text-slate-500">or</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      {/* Register link */}
+      <p className="text-center text-sm text-slate-700">
         Don’t have an account?{" "}
         <span
-          className="text-blue-600 cursor-pointer hover:underline font-medium"
+          className="text-indigo-700 cursor-pointer hover:underline font-semibold"
           onClick={() => navigate("/register")}
+          role="button"
+          tabIndex={0}
         >
           Register
         </span>

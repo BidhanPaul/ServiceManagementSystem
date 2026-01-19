@@ -1,0 +1,511 @@
+// src/pages/OrdersList.js
+import { useEffect, useMemo, useState } from "react";
+import Sidebar from "../layout/Sidebar";
+import TopNav from "../components/TopNav";
+import API from "../api/api";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import {
+  FiRefreshCw,
+  FiSearch,
+  FiFilter,
+  FiClipboard,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiXCircle,
+  FiChevronRight,
+  FiDownload,
+  FiArrowUp,
+  FiArrowDown,
+} from "react-icons/fi";
+
+export default function OrdersList() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // UI state
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL"); // kept
+  const [activeTab, setActiveTab] = useState("ALL"); // NEW (tabs)
+  const [sortKey, setSortKey] = useState("createdAt"); // NEW
+  const [sortDir, setSortDir] = useState("desc"); // NEW
+
+  const navigate = useNavigate();
+  const role = localStorage.getItem("role");
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await API.get("/orders");
+      setOrders(res.data || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load orders.");
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line
+  }, []);
+
+  const badgeClass = (status) => {
+    switch (status) {
+      case "PENDING_RP_APPROVAL":
+        return "bg-amber-50 text-amber-800 border border-amber-200";
+      case "APPROVED":
+        return "bg-emerald-50 text-emerald-800 border border-emerald-200";
+      case "REJECTED":
+        return "bg-red-50 text-red-800 border border-red-200";
+      default:
+        return "bg-slate-50 text-slate-700 border border-slate-200";
+    }
+  };
+
+  const statusIcon = (status) => {
+    switch (status) {
+      case "PENDING_RP_APPROVAL":
+        return <FiAlertCircle className="text-amber-600" />;
+      case "APPROVED":
+        return <FiCheckCircle className="text-emerald-600" />;
+      case "REJECTED":
+        return <FiXCircle className="text-red-600" />;
+      default:
+        return <FiClipboard className="text-slate-600" />;
+    }
+  };
+
+  const fmtMoney = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "-";
+    return `${n.toFixed(2)} €`;
+  };
+
+  const fmtDateTime = (v) => {
+    if (!v) return "-";
+    try {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return String(v);
+      return d.toLocaleString();
+    } catch {
+      return String(v);
+    }
+  };
+
+  const toTime = (v) => {
+    if (!v) return 0;
+    const t = new Date(v).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+
+  // -------- summary cards --------
+  const counts = useMemo(() => {
+    const all = orders || [];
+    const pending = all.filter((o) => o.status === "PENDING_RP_APPROVAL").length;
+    const approved = all.filter((o) => o.status === "APPROVED").length;
+    const rejected = all.filter((o) => o.status === "REJECTED").length;
+    const withFeedback = all.filter((o) => o.rating != null).length;
+    return { total: all.length, pending, approved, rejected, withFeedback };
+  }, [orders]);
+
+  // -------- filtering / search + tabs + sort --------
+  const filteredOrders = useMemo(() => {
+    const text = (q || "").trim().toLowerCase();
+
+    let list = [...(orders || [])];
+
+    // keep existing dropdown filter behavior
+    if (statusFilter !== "ALL") {
+      list = list.filter((o) => o.status === statusFilter);
+    }
+
+    // NEW: tab filter (works together; if both set, it narrows down)
+    if (activeTab !== "ALL") {
+      list = list.filter((o) => o.status === activeTab);
+    }
+
+    if (text) {
+      list = list.filter((o) => {
+        const haystack = [
+          o.id,
+          o.status,
+          o.requestNumber,
+          o.requestId,
+          o.title,
+          o.supplierName,
+          o.specialistName,
+        ]
+          .map((x) => (x == null ? "" : String(x)))
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.includes(text);
+      });
+    }
+
+    // NEW: sort
+    const dir = sortDir === "asc" ? 1 : -1;
+
+    list.sort((a, b) => {
+      if (sortKey === "createdAt") return (toTime(a.createdAt) - toTime(b.createdAt)) * dir;
+      if (sortKey === "value") return ((Number(a.contractValue) || 0) - (Number(b.contractValue) || 0)) * dir;
+      if (sortKey === "status") return String(a.status || "").localeCompare(String(b.status || "")) * dir;
+      if (sortKey === "orderId") return ((Number(a.id) || 0) - (Number(b.id) || 0)) * dir;
+      return 0;
+    });
+
+    return list;
+  }, [orders, q, statusFilter, activeTab, sortKey, sortDir]);
+
+  // -------- CSV export (client-side) --------
+  const downloadCSV = () => {
+    const rows = filteredOrders.map((o) => ({
+      id: o.id ?? "",
+      status: o.status ?? "",
+      requestNumber: o.requestNumber ?? "",
+      requestId: o.requestId ?? "",
+      title: o.title ?? "",
+      supplierName: o.supplierName ?? "",
+      specialistName: o.specialistName ?? "",
+      contractValue: o.contractValue ?? "",
+      createdAt: o.createdAt ?? "",
+      rating: o.rating ?? "",
+    }));
+
+    const headers = Object.keys(rows[0] || { id: "" });
+
+    const escape = (val) => {
+      const s = val == null ? "" : String(val);
+      // wrap in quotes & escape internal quotes
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => headers.map((h) => escape(r[h])).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const SortBtn = ({ label, k }) => {
+    const active = sortKey === k;
+    return (
+      <button
+        onClick={() => {
+          if (sortKey !== k) {
+            setSortKey(k);
+            setSortDir("desc");
+          } else {
+            setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+          }
+        }}
+        className={
+          "inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition " +
+          (active
+            ? "bg-slate-900 text-white border-slate-900"
+            : "bg-white/80 text-slate-700 border-slate-200 hover:bg-white")
+        }
+        type="button"
+        title={`Sort by ${label}`}
+      >
+        {label}
+        {active ? (
+          sortDir === "desc" ? <FiArrowDown /> : <FiArrowUp />
+        ) : null}
+      </button>
+    );
+  };
+
+  const Tab = ({ label, value, count }) => {
+    const active = activeTab === value;
+    return (
+      <button
+        onClick={() => setActiveTab(value)}
+        className={
+          "px-4 py-2 rounded-full text-xs font-semibold border transition inline-flex items-center gap-2 " +
+          (active
+            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+            : "bg-white/70 text-slate-700 border-slate-200 hover:bg-white")
+        }
+        type="button"
+      >
+        {label}
+        <span
+          className={
+            "px-2 py-0.5 rounded-full text-[11px] font-bold " +
+            (active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700")
+          }
+        >
+          {count}
+        </span>
+      </button>
+    );
+  };
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+
+      <div className="flex-1 bg-gradient-to-b from-slate-50 via-sky-50 to-slate-100">
+        <div className="p-4 sm:p-6">
+          <TopNav />
+
+          {/* Header + filters */}
+          <div className="mt-4 bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                    <FiClipboard className="text-slate-900" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                      Service Orders
+                    </h1>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      PM sees only their own orders. Resource Planner sees all, including pending approvals.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  onClick={downloadCSV}
+                  className="px-3 py-2 rounded-xl bg-white/80 border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-white transition inline-flex items-center gap-2"
+                  type="button"
+                  title="Download filtered orders as CSV"
+                  disabled={filteredOrders.length === 0}
+                >
+                  <FiDownload />
+                  Export CSV
+                </button>
+
+                <button
+                  onClick={load}
+                  className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition inline-flex items-center gap-2"
+                  type="button"
+                >
+                  <FiRefreshCw />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Tab label="All" value="ALL" count={counts.total} />
+              <Tab label="Pending" value="PENDING_RP_APPROVAL" count={counts.pending} />
+              <Tab label="Approved" value="APPROVED" count={counts.approved} />
+              <Tab label="Rejected" value="REJECTED" count={counts.rejected} />
+              <Tab label="Feedback" value="FEEDBACK" count={counts.withFeedback} />
+            </div>
+
+            {/* Search + status dropdown + sort buttons */}
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2">
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Search
+                </label>
+                <div className="mt-1 flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-3 py-2">
+                  <FiSearch className="text-slate-500" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    className="w-full outline-none bg-transparent text-sm text-slate-800 placeholder-slate-400"
+                    placeholder="Order #, request no, title, supplier, specialist…"
+                  />
+                  {q?.trim() && (
+                    <button
+                      onClick={() => setQ("")}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Status (dropdown)
+                </label>
+                <div className="mt-1 flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-3 py-2">
+                  <FiFilter className="text-slate-500" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full outline-none bg-transparent text-sm text-slate-800"
+                  >
+                    <option value="ALL">All</option>
+                    <option value="PENDING_RP_APPROVAL">Pending RP Approval</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Sort controls */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-600 mr-1">
+                Sort:
+              </span>
+              <SortBtn label="Created" k="createdAt" />
+              <SortBtn label="Value" k="value" />
+              <SortBtn label="Status" k="status" />
+              <SortBtn label="Order #" k="orderId" />
+              <div className="ml-auto text-xs text-slate-500">
+                Showing{" "}
+                <span className="font-semibold text-slate-700">
+                  {filteredOrders.length}
+                </span>{" "}
+                results
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="mt-4 bg-white/85 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {loading ? (
+              <div className="p-6 text-slate-700">Loading…</div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="p-10 text-center text-slate-600">
+                No orders found.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-[1250px] w-full text-sm">
+                  <thead className="bg-slate-50/80">
+                    <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
+                      <th className="py-3 px-4">Order</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Request</th>
+                      <th className="py-3 px-4">Title</th>
+                      <th className="py-3 px-4">Supplier</th>
+                      <th className="py-3 px-4">Specialist</th>
+                      <th className="py-3 px-4">Value</th>
+                      <th className="py-3 px-4">Created</th>
+                      <th className="py-3 px-4">Feedback</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100 bg-white/60">
+                    {filteredOrders
+                      .filter((o) => {
+                        // NEW: Feedback tab (only affects view, no logic change)
+                        if (activeTab !== "FEEDBACK") return true;
+                        return o.rating != null;
+                      })
+                      .map((o) => (
+                        <tr
+                          key={o.id}
+                          className="hover:bg-slate-50/80 transition cursor-pointer"
+                          onClick={() => navigate(`/orders/${o.id}`)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") navigate(`/orders/${o.id}`);
+                          }}
+                        >
+                          <td className="py-3 px-4 font-semibold text-slate-900">
+                            #{o.id}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={
+                                "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold " +
+                                badgeClass(o.status)
+                              }
+                            >
+                              {statusIcon(o.status)}
+                              {o.status}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="text-xs text-slate-800">
+                              {o.requestNumber || "-"}
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              ID: {o.requestId ?? "-"}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 text-slate-800">
+                            {o.title || "-"}
+                          </td>
+                          <td className="py-3 px-4 text-slate-800">
+                            {o.supplierName || "-"}
+                          </td>
+                          <td className="py-3 px-4 text-slate-800">
+                            {o.specialistName || "-"}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="font-semibold text-slate-900">
+                              {fmtMoney(o.contractValue)}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-xs text-slate-600">
+                            {fmtDateTime(o.createdAt)}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {o.rating != null ? (
+                              <span className="text-emerald-700 font-semibold">
+                                ⭐ {o.rating}/5
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 text-xs">
+                                {role === "PROJECT_MANAGER" ? "Not yet" : "-"}
+                              </span>
+                            )}
+                          </td>
+
+                          <td
+                            className="py-3 px-4 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => navigate(`/orders/${o.id}`)}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                              type="button"
+                            >
+                              Open <FiChevronRight />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {!loading && (
+            <p className="text-slate-500 text-xs mt-3">
+              Tip: click a row to open details. Use tabs + search + sorting for faster review.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

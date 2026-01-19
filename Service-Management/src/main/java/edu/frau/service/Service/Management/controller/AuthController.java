@@ -100,6 +100,4 @@ public class AuthController {
         public String getUsername() { return username; }
         public String getRole() { return role; }
     }
-
-   
 }

@@ -175,90 +175,6 @@ export default function Dashboard() {
 
           {/* ---------- STAT CARDS ---------- */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-            {/* Total Users */}
-            <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-blue-50 w-12 h-12">
-                <FiUsers className="text-blue-600 text-2xl" />
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-                  Total Users
-                </p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">
-                  {totalUsers}
-                </p>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  All registered users in the system
-                </p>
-              </div>
-            </div>
-
-            {/* Dynamic Role Cards */}
-            {Object.entries(roleCounts).map(([role, count]) => (
-              <div
-                key={role}
-                className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow"
-              >
-                <div className="inline-flex items-center justify-center rounded-2xl bg-sky-50 w-12 h-12">
-                  {roleIcons[role] || defaultIcon}
-                </div>
-
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-                    {role.replace("_", " ")}
-                  </p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">
-                    {count}
-                  </p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    Users with this role
-                  </p>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* ---------- CHARTS ROW ---------- */}
-          {/* ---------- CHARTS ROW ---------- */}
-<section className="grid grid-cols-1 lg:grid-cols-2 gap-4 auto-rows-[1fr]">
-
-  {/* Pie Chart */}
-  <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
-    <h2 className="text-base font-semibold text-slate-900 mb-1">
-      Employees by Role
-    </h2>
-    <p className="text-xs text-slate-500 mb-3">
-      Visual distribution of user roles.
-    </p>
-
-    <div className="flex-1 flex items-center justify-center">
-      <UserRolePieChart />
-    </div>
-  </div>
-
-  {/* Recent Signups */}
-  <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm p-4 md:p-5 h-[420px] flex flex-col">
-    <h2 className="text-base font-semibold text-slate-900 mb-1">
-      Recent Signups
-    </h2>
-    <p className="text-xs text-slate-500 mb-3">
-      Latest registered users.
-    </p>
-
-    {/* Scrollable list inside fixed panel */}
-    <div className="flex-1 overflow-y-auto pr-1">
-      <RecentUsersTimeline />
-    </div>
-  </div>
-
-</section>
-=======
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
             {/* Total Users */}
             <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="inline-flex items-center justify-center rounded-2xl bg-blue-50 w-12 h-12">
@@ -334,10 +250,6 @@ export default function Dashboard() {
               </div>
             </div>
           </section>
-<<<<<<< HEAD
-=======
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
 
           {/* ✅ NEW: ADMIN REQUEST DELETE SECTION (keeps everything else unchanged) */}
           {isAdmin && (
@@ -479,4 +391,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

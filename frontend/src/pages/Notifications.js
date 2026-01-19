@@ -1,52 +1,14 @@
 // src/pages/Notifications.js
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import API from "../api/api";
-import TopNav from "../components/TopNav";
-import { FiBell, FiCheckCircle } from "react-icons/fi";
-
-export default function Notifications() {
-    const [notifications, setNotifications] = useState([]);
-
-    // User context (retrieved once)
-    const username = localStorage.getItem("username");
-    const role = localStorage.getItem("role"); // ADMIN, PM, PO, RP
-
-    // ---------------------------------------------------------
-    // LOAD NOTIFICATIONS BASED ON USER ROLE
-    // ---------------------------------------------------------
-    const loadNotifications = useCallback(async () => {
-        if (!role) {
-            console.warn("User role not found. Skipping notifications fetch.");
-            return;
-        }
-
-        try {
-            let endpoint = `/notifications/${role}`;
-
-            if (role === "ADMIN") {
-                endpoint = "/notifications/admin";
-            }
-
-            const res = await API.get(endpoint);
-            setNotifications(Array.isArray(res.data) ? res.data : []);
-        } catch (err) {
-            console.error("Failed to load notifications", e
-=======
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
-import { useEffect, useMemo, useState } from "react";
-import API from "../api/api";
-import TopNav from "../components/TopNav";
-import Sidebar from "../layout/Sidebar";
+import MainLayout from "../layout/MainLayout";
 import {
   FiBell,
   FiCheckCircle,
   FiMessageSquare,
-  FiChevronDown,
   FiChevronRight,
+  FiSearch,
+  FiSend,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
@@ -73,15 +35,13 @@ function parseLegacyDm(message) {
   return { from, to, req, text };
 }
 
-// ✅ Extract participants from threadKey (works even if DB row is broken/self-copy)
+// ✅ Extract participants from threadKey
 function extractUsersFromThreadKey(threadKey) {
   if (!threadKey || typeof threadKey !== "string") return [];
 
-  // format 1: REQ-25:John-Mausam
   const m1 = threadKey.match(/^REQ-(.*?):([^:]+)-([^:]+)$/);
   if (m1) return [m1[2], m1[3]].filter(Boolean);
 
-  // format 2: REQ:SUPPORT|U:Bidhan|Paul
   const m2 = threadKey.match(/\|U:([^|]+)\|([^|]+)$/);
   if (m2) return [m2[1], m2[2]].filter(Boolean);
 
@@ -111,7 +71,9 @@ function normalizeDmNotification(n) {
   const legacy = parseLegacyDm(n.message);
   if (legacy) {
     const users = [legacy.from, legacy.to].filter(Boolean).sort();
-    const threadKey = `REQ:${legacy.req}|U:${users[0] || "?"}|${users[1] || "?"}`;
+    const threadKey = `REQ:${legacy.req}|U:${users[0] || "?"}|${
+      users[1] || "?"
+    }`;
     return { ...legacy, threadKey, fromRole: "", toRole: "", _source: "LEGACY" };
   }
 
@@ -122,15 +84,21 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState("DM");
 
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [replyTarget, setReplyTarget] = useState(null);
+  // Slack style
+  const [selectedThreadKey, setSelectedThreadKey] = useState(null);
+  const [threadQuery, setThreadQuery] = useState("");
 
-  const [expandedThreads, setExpandedThreads] = useState(() => ({}));
+  // ✅ Inline composer
+  const [composerText, setComposerText] = useState("");
+  const [sending, setSending] = useState(false);
+
   const [requestTitleById, setRequestTitleById] = useState({});
 
   const username = localStorage.getItem("username");
   const role = localStorage.getItem("role");
+
+  // ✅ Auto-scroll anchor
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     loadNotifications();
@@ -174,13 +142,8 @@ export default function Notifications() {
     try {
       const unreadActionable = (notifications || []).filter((n) => {
         if (n.read) return false;
-
-        // DM: only mark if I am recipient (incoming)
-        if (n.category === "DIRECT_MESSAGE") {
+        if (n.category === "DIRECT_MESSAGE")
           return n.recipientUsername === username;
-        }
-
-        // SYSTEM: mark it
         return true;
       });
 
@@ -193,12 +156,9 @@ export default function Notifications() {
         unreadActionable.map((n) => API.post(`/notifications/${n.id}/read`))
       );
 
+      const unreadIds = new Set(unreadActionable.map((n) => n.id));
       setNotifications((prev) =>
-        prev.map((n) =>
-          unreadActionable.some((u) => u.id === n.id ? true : false)
-            ? { ...n, read: true }
-            : n
-        )
+        prev.map((n) => (unreadIds.has(n.id) ? { ...n, read: true } : n))
       );
 
       toast.success("All notifications marked as read.");
@@ -216,12 +176,10 @@ export default function Notifications() {
     return (notifications || []).filter((n) => !normalizeDmNotification(n));
   }, [notifications]);
 
-  // ✅ system unread indicators
   const systemUnreadCount = useMemo(
     () => (systemItems || []).filter((n) => !n.read).length,
     [systemItems]
   );
-  const hasUnreadSystem = systemUnreadCount > 0;
 
   const dmThreads = useMemo(() => {
     const map = new Map();
@@ -232,7 +190,12 @@ export default function Notifications() {
 
       const key = dm.threadKey || "NO_THREAD";
       if (!map.has(key)) {
-        map.set(key, { key, reqId: dm.req || "", participants: [], messages: [] });
+        map.set(key, {
+          key,
+          reqId: dm.req || "",
+          participants: [],
+          messages: [],
+        });
       }
 
       map.get(key).messages.push({
@@ -255,7 +218,6 @@ export default function Notifications() {
         if (m?.dm?.from) people.add(m.dm.from);
         if (m?.dm?.to) people.add(m.dm.to);
       }
-
       extractUsersFromThreadKey(t.key).forEach((u) => people.add(u));
 
       return { ...t, participants: Array.from(people), messages: sorted };
@@ -274,6 +236,23 @@ export default function Notifications() {
     return threads;
   }, [dmFlatItems]);
 
+  // auto-select first thread if none selected
+  useEffect(() => {
+    if (activeTab !== "DM") return;
+    if (!dmThreads.length) {
+      setSelectedThreadKey(null);
+      return;
+    }
+    if (
+      selectedThreadKey &&
+      dmThreads.some((t) => t.key === selectedThreadKey)
+    )
+      return;
+    setSelectedThreadKey(dmThreads[0].key);
+    // eslint-disable-next-line
+  }, [activeTab, dmThreads.map((t) => t.key).join("|")]);
+
+  // load request titles for DM threads
   useEffect(() => {
     const ids = Array.from(
       new Set(
@@ -309,20 +288,51 @@ export default function Notifications() {
     // eslint-disable-next-line
   }, [dmThreads]);
 
-  const toggleThread = (threadKey) => {
-    setExpandedThreads((prev) => ({ ...prev, [threadKey]: !prev[threadKey] }));
+  const getThreadUnreadCount = (thread) => {
+    return (thread?.messages || []).filter(
+      (m) => m?.dm?.from !== username && !m.read
+    ).length;
   };
 
-  const openReplyForThread = (thread) => {
-    if (!thread) return;
+  const filteredThreads = useMemo(() => {
+    const q = (threadQuery || "").trim().toLowerCase();
+    if (!q) return dmThreads;
+
+    return (dmThreads || []).filter((t) => {
+      const title = (
+        requestTitleById[t.reqId] || `Request #${t.reqId || ""}`
+      ).toLowerCase();
+      const participants = (t.participants || []).join(" ").toLowerCase();
+      return (
+        title.includes(q) ||
+        participants.includes(q) ||
+        String(t.reqId || "").includes(q)
+      );
+    });
+  }, [dmThreads, threadQuery, requestTitleById]);
+
+  const selectedThread = useMemo(() => {
+    if (!selectedThreadKey) return null;
+    return (dmThreads || []).find((t) => t.key === selectedThreadKey) || null;
+  }, [dmThreads, selectedThreadKey]);
+
+  // ✅ Auto-scroll when thread changes OR when message count changes
+  useEffect(() => {
+    if (!selectedThread) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // eslint-disable-next-line
+  }, [
+    selectedThreadKey,
+    selectedThread ? selectedThread.messages.length : 0,
+  ]);
+
+  // Determine recipient for inline send
+  const getReplyTargetFromThread = (thread) => {
+    if (!thread) return null;
 
     const participants = thread.participants || [];
     const otherUsername = participants.find((u) => u && u !== username);
-
-    if (!otherUsername) {
-      toast.error("Could not determine who to reply to.");
-      return;
-    }
+    if (!otherUsername) return null;
 
     const last = thread.messages?.[thread.messages.length - 1];
     const otherRole =
@@ -332,65 +342,85 @@ export default function Notifications() {
         ? last?.dm?.toRole
         : null;
 
-    setReplyTarget({
+    return {
       otherUsername,
       otherRole,
       reqId: thread.reqId || "",
       threadKey: thread.key,
-    });
-
-    setReplyText("");
-    setReplyOpen(true);
+    };
   };
 
-  const sendReply = async () => {
-    if (!replyTarget?.otherUsername) {
-      toast.error("No recipient found for reply.");
+  const sendInlineMessage = async () => {
+    if (!selectedThread) {
+      toast.error("Select a conversation first.");
       return;
     }
-    if (!replyText.trim()) {
+    if (!composerText.trim()) {
       toast.error("Write a message.");
       return;
     }
 
+    const target = getReplyTargetFromThread(selectedThread);
+    if (!target?.otherUsername) {
+      toast.error("Could not determine who to reply to.");
+      return;
+    }
+
     try {
+      setSending(true);
       await API.post(
         "/notifications/direct-message",
         {
-          threadKey: replyTarget.threadKey,
-          requestId: String(replyTarget.reqId || ""),
+          threadKey: target.threadKey,
+          requestId: String(target.reqId || ""),
           senderUsername: username,
           senderRole: role,
-          recipientUsername: replyTarget.otherUsername,
-          recipientRole: replyTarget.otherRole || "PROJECT_MANAGER",
-          message: replyText.trim(),
+          recipientUsername: target.otherUsername,
+          recipientRole: target.otherRole || "PROJECT_MANAGER",
+          message: composerText.trim(),
         },
         { headers: { "Content-Type": "application/json" } }
       );
 
+      setComposerText("");
       toast.success("Message sent.");
-      setReplyText("");
-      loadNotifications();
+      await loadNotifications();
+
+      // ✅ ensure we land at bottom after refresh
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
     } catch (err) {
-      console.error("Failed to send reply", err?.response || err);
-      toast.error("Failed to send reply.");
+      console.error("Failed to send message", err?.response || err);
+      toast.error("Failed to send message.");
+    } finally {
+      setSending(false);
     }
   };
+
+  const unreadCountAll = useMemo(() => {
+    return (notifications || []).filter((n) => {
+      if (n.read) return false;
+      if (n.category === "DIRECT_MESSAGE")
+        return n.recipientUsername === username;
+      return true;
+    }).length;
+  }, [notifications, username]);
 
   const renderSystemCard = (n) => (
     <div
       key={n.id}
-      className={`p-4 rounded-2xl border shadow-sm backdrop-blur-md transition 
-        ${
-          n.read
-            ? "bg-white/40 border-white/50 text-slate-600"
-            : "bg-white/70 border-white/80 shadow-lg text-slate-900"
-        }`}
+      className={
+        "p-4 rounded-2xl border shadow-sm transition " +
+        (n.read
+          ? "bg-white/60 border-slate-200 text-slate-600"
+          : "bg-white border-blue-200 text-slate-900")
+      }
     >
       <div className="flex justify-between items-start gap-3">
-        <div className="flex flex-col">
-          <p className="font-semibold">System Notification</p>
-          <p className="mt-2">{n.message}</p>
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900">System Notification</p>
+          <p className="mt-2 text-sm break-words">{n.message}</p>
           <p className="text-xs text-slate-500 mt-2">
             {n.sentAt ? new Date(n.sentAt).toLocaleString() : ""}
           </p>
@@ -399,13 +429,13 @@ export default function Notifications() {
         {!n.read ? (
           <button
             onClick={() => markRead(n.id)}
-            className="bg-blue-600 text-white text-xs font-medium px-4 py-2 rounded-full shadow hover:bg-blue-700 transition whitespace-nowrap"
+            className="bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition whitespace-nowrap"
             type="button"
           >
             Mark as Read
           </button>
         ) : (
-          <span className="flex items-center gap-1 text-xs text-green-600 font-medium whitespace-nowrap">
+          <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold whitespace-nowrap">
             <FiCheckCircle /> Read
           </span>
         )}
@@ -413,292 +443,339 @@ export default function Notifications() {
     </div>
   );
 
-  const getThreadUnreadCount = (thread) => {
-    return (thread?.messages || []).filter(
-      (m) => m?.dm?.from !== username && !m.read
-    ).length;
-  };
-  const threadHasUnread = (thread) => getThreadUnreadCount(thread) > 0;
-
-  const renderThread = (thread) => {
-    const reqTitle =
-      requestTitleById[thread.reqId] || `Request #${thread.reqId || "—"}`;
-
-    const other =
-      (thread.participants || []).find((u) => u && u !== username) || "-";
-    const me = username || "-";
-
-    const expanded = !!expandedThreads[thread.key];
-
-    return (
-      <div
-        key={thread.key}
-        className="bg-white/70 border border-white/80 shadow-lg rounded-2xl"
-      >
-        {/* ✅ Sticky thread header (only matters when expanded) */}
-        <div
-          className={`p-4 ${expanded ? "sticky top-0 z-10 bg-white/90 backdrop-blur-md rounded-t-2xl border-b border-white/70" : ""}`}
-        >
-          <div className="flex items-start justify-between gap-3">
+  return (
+    <MainLayout>
+      <div className="h-[calc(100vh-120px)] flex flex-col min-w-0">
+        {/* Header */}
+        <div className="bg-white/60 backdrop-blur-xl border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-bold text-slate-900">{reqTitle}</p>
-
-                {threadHasUnread(thread) && (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow" />
-                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                      {getThreadUnreadCount(thread)}
-                    </span>
-                  </span>
-                )}
-              </div>
-
-              <p className="text-sm text-slate-600 mt-0.5">
-                Conversation: <span className="font-medium">{me}</span> ↔{" "}
-                <span className="font-medium">{other}</span>
-              </p>
-
-              <p className="text-xs text-slate-500 mt-1">
-                Request ID: {thread.reqId}
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-2">
+                <FiBell className="text-blue-600" /> Notifications
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">
+                Direct Messages and System notifications in one place.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleThread(thread.key)}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-white/80 border border-slate-200 hover:bg-white transition flex items-center gap-2"
-                type="button"
-              >
-                {expanded ? <FiChevronDown /> : <FiChevronRight />}
-                {expanded ? "Collapse" : "Expand"}
-              </button>
+            <button
+              onClick={markAllAsRead}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white shadow hover:bg-blue-700 transition"
+              type="button"
+            >
+              Mark ALL as Read ({unreadCountAll})
+            </button>
+          </div>
 
-              <button
-                onClick={() => openReplyForThread(thread)}
-                className="bg-indigo-600 text-white text-xs font-medium px-4 py-2 rounded-full shadow hover:bg-indigo-700 transition whitespace-nowrap"
-                type="button"
-              >
-                Reply
-              </button>
-            </div>
+          {/* Tabs */}
+          <div className="flex gap-2 mt-4 flex-wrap">
+            <button
+              onClick={() => setActiveTab("DM")}
+              className={
+                "px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 border transition " +
+                (activeTab === "DM"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white/70 text-slate-700 border-slate-200 hover:bg-white")
+              }
+              type="button"
+            >
+              <FiMessageSquare />
+              Direct Messages ({dmThreads.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab("SYSTEM")}
+              className={
+                "relative px-4 py-2 rounded-xl text-sm font-semibold border transition " +
+                (activeTab === "SYSTEM"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white/70 text-slate-700 border-slate-200 hover:bg-white")
+              }
+              type="button"
+            >
+              {systemUnreadCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
+                  {systemUnreadCount}
+                </span>
+              )}
+              System ({systemItems.length})
+            </button>
           </div>
         </div>
 
-        {/* ✅ Scrollable message area when expanded */}
-        {expanded && (
-          <div className="px-4 pb-4">
-            <div className="mt-4 space-y-3 max-h-[420px] overflow-y-auto pr-2">
-              {thread.messages.map((m) => {
-                const isMine = m.dm?.from === username;
+        {/* Content */}
+        <div className="flex-1 min-h-0 mt-4">
+          {activeTab === "SYSTEM" ? (
+            <div className="h-full overflow-y-auto pr-1">
+              <div className="space-y-4 max-w-4xl">
+                {systemItems.length === 0 ? (
+                  <div className="text-center text-slate-600 bg-white/70 backdrop-blur-md p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    No system notifications found.
+                  </div>
+                ) : (
+                  systemItems.map((n) => renderSystemCard(n))
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="h-full min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Left: Thread list */}
+              <div className="lg:col-span-4 bg-white/70 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div className="p-3 border-b border-slate-200 bg-white/70">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-slate-900 text-white">
+                      <FiSearch />
+                    </div>
+                    <input
+                      value={threadQuery}
+                      onChange={(e) => setThreadQuery(e.target.value)}
+                      placeholder="Search threads (title / user / id)"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300/60"
+                    />
+                  </div>
+                </div>
 
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[75%] border rounded-2xl p-3 shadow-sm ${
-                        isMine
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-slate-900 border-slate-200"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start gap-3">
-                        <div>
-                          <p className="text-[11px] opacity-90">
-                            {isMine ? "You" : m.dm?.from || "-"}
-                          </p>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {filteredThreads.length === 0 ? (
+                    <div className="p-4 text-sm text-slate-600">
+                      No conversations match your search.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-200">
+                      {filteredThreads.map((t) => {
+                        const reqTitle =
+                          requestTitleById[t.reqId] ||
+                          `Request #${t.reqId || "—"}`;
 
-                          <p className="mt-1 whitespace-pre-wrap">
-                            {m.dm?.text || ""}
-                          </p>
+                        const other =
+                          (t.participants || []).find(
+                            (u) => u && u !== username
+                          ) || "-";
 
-                          <p
-                            className={`text-[11px] mt-2 ${
-                              isMine ? "text-white/80" : "text-slate-500"
-                            }`}
-                          >
-                            {m.sentAt ? new Date(m.sentAt).toLocaleString() : ""}
-                          </p>
-                        </div>
+                        const last = t.messages?.[t.messages.length - 1];
+                        const lastText = last?.dm?.text || "";
+                        const unread = getThreadUnreadCount(t);
 
-                        {!isMine && !m.read ? (
+                        const selected = t.key === selectedThreadKey;
+
+                        return (
                           <button
-                            onClick={() => markRead(m.id)}
-                            className="bg-blue-600 text-white text-[11px] font-medium px-3 py-1.5 rounded-full shadow hover:bg-blue-700 transition whitespace-nowrap"
+                            key={t.key}
+                            onClick={() => {
+                              setSelectedThreadKey(t.key);
+                              setComposerText("");
+                            }}
+                            className={
+                              "w-full text-left p-4 transition " +
+                              (selected
+                                ? "bg-slate-900 text-white"
+                                : "hover:bg-slate-50 text-slate-900")
+                            }
                             type="button"
                           >
-                            Mark as Read
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p
+                                  className={
+                                    "font-semibold text-sm break-words " +
+                                    (selected
+                                      ? "text-white"
+                                      : "text-slate-900")
+                                  }
+                                >
+                                  {reqTitle}
+                                </p>
+                                <p
+                                  className={
+                                    "text-xs mt-0.5 " +
+                                    (selected
+                                      ? "text-white/80"
+                                      : "text-slate-600")
+                                  }
+                                >
+                                  {other} • Request ID: {t.reqId || "—"}
+                                </p>
+                                <p
+                                  className={
+                                    "text-xs mt-1 truncate " +
+                                    (selected
+                                      ? "text-white/80"
+                                      : "text-slate-500")
+                                  }
+                                >
+                                  {lastText}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {unread > 0 && (
+                                  <span
+                                    className={
+                                      "text-[11px] font-bold px-2 py-0.5 rounded-full " +
+                                      (selected
+                                        ? "bg-white text-slate-900"
+                                        : "bg-blue-600 text-white")
+                                    }
+                                  >
+                                    {unread}
+                                  </span>
+                                )}
+                                <FiChevronRight
+                                  className={
+                                    selected
+                                      ? "text-white/80"
+                                      : "text-slate-400"
+                                  }
+                                />
+                              </div>
+                            </div>
                           </button>
-                        ) : !isMine && m.read ? (
-                          <span className="flex items-center gap-1 text-[11px] text-green-600 font-medium whitespace-nowrap">
-                            <FiCheckCircle /> Read
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Messages + Inline composer */}
+              <div className="lg:col-span-8 bg-white/70 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
+                {!selectedThread ? (
+                  <div className="p-6 text-slate-700">
+                    Select a conversation to view messages.
+                  </div>
+                ) : (
+                  <>
+                    {/* Conversation header */}
+                    <div className="p-4 border-b border-slate-200 bg-white/70">
+                      <div className="min-w-0">
+                        <p className="text-lg font-semibold text-slate-900 break-words">
+                          {requestTitleById[selectedThread.reqId] ||
+                            `Request #${selectedThread.reqId || "—"}`}
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1">
+                          Participants:{" "}
+                          <span className="font-medium">
+                            {(selectedThread.participants || []).join(" , ") ||
+                              "-"}
                           </span>
-                        ) : null}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Request ID: {selectedThread.reqId || "—"}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
-  const itemsToShow = activeTab === "DM" ? dmThreads : systemItems;
+                    {/* Messages list */}
+                    <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                      {selectedThread.messages.map((m) => {
+                        const isMine = m.dm?.from === username;
 
-  // ✅ Page count should not include outgoing DM
-  const unreadCountAll = useMemo(() => {
-    return (notifications || []).filter((n) => {
-      if (n.read) return false;
-      if (n.category === "DIRECT_MESSAGE") return n.recipientUsername === username;
-      return true;
-    }).length;
-  }, [notifications, username]);
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex ${
+                              isMine ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            <div
+                              className={
+                                "max-w-[78%] border rounded-2xl p-3 shadow-sm " +
+                                (isMine
+                                  ? "bg-slate-900 text-white border-slate-900"
+                                  : "bg-white text-slate-900 border-slate-200")
+                              }
+                            >
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[11px] opacity-80">
+                                    {isMine ? "You" : m.dm?.from || "-"}
+                                  </p>
 
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+                                  <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+                                    {m.dm?.text || ""}
+                                  </p>
 
-      {/* ✅ page does NOT scroll; list scrolls */}
-      <div className="flex-1 h-screen bg-gradient-to-b from-blue-100 via-sky-100 to-blue-300 p-6 overflow-hidden">
-        <TopNav />
+                                  <p
+                                    className={`text-[11px] mt-2 ${
+                                      isMine
+                                        ? "text-white/70"
+                                        : "text-slate-500"
+                                    }`}
+                                  >
+                                    {m.sentAt
+                                      ? new Date(m.sentAt).toLocaleString()
+                                      : ""}
+                                  </p>
+                                </div>
 
-        <div className="h-full flex flex-col">
-          {/* ✅ Sticky header area */}
-          <div className="sticky top-0 z-20 pb-4">
-            <div className="mt-4 mb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-2">
-                  <FiBell className="text-blue-600" /> Notifications
-                </h1>
-                <p className="text-sm text-slate-600 mt-1">
-                  System alerts and Direct Messages are separated below.
-                </p>
-              </div>
+                                {!isMine && !m.read ? (
+                                  <button
+                                    onClick={() => markRead(m.id)}
+                                    className="bg-blue-600 text-white text-[11px] font-semibold px-3 py-1.5 rounded-full hover:bg-blue-700 transition whitespace-nowrap"
+                                    type="button"
+                                  >
+                                    Mark as Read
+                                  </button>
+                                ) : !isMine && m.read ? (
+                                  <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold whitespace-nowrap">
+                                    <FiCheckCircle /> Read
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={markAllAsRead}
-                  className="px-4 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white shadow hover:bg-blue-700 transition"
-                  type="button"
-                >
-                  Mark ALL as Read ({unreadCountAll})
-                </button>
-              </div>
-            </div>
+                      {/* ✅ scroll anchor */}
+                      <div ref={messagesEndRef} />
+                    </div>
 
-            <div className="flex gap-2 mb-2">
-              <button
-                onClick={() => setActiveTab("DM")}
-                className={`px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 ${
-                  activeTab === "DM"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "bg-white/70 text-slate-700 border border-white/80"
-                }`}
-                type="button"
-              >
-                <FiMessageSquare />
-                Direct Messages ({dmThreads.length})
-              </button>
+                    {/* ✅ Inline composer */}
+                    <div className="p-3 border-t border-slate-200 bg-white/70">
+                      <div className="flex items-end gap-2">
+                        <textarea
+                          value={composerText}
+                          onChange={(e) => setComposerText(e.target.value)}
+                          rows={2}
+                          placeholder="Type a message… (Enter = send, Shift+Enter = new line)"
+                          className="flex-1 resize-none bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (!sending) sendInlineMessage();
+                            }
+                          }}
+                        />
 
-              {/* ✅ System tab with RED DOT + unread count */}
-              <button
-                onClick={() => setActiveTab("SYSTEM")}
-                className={`relative px-4 py-2 rounded-full text-sm font-semibold ${
-                  activeTab === "SYSTEM"
-                    ? "bg-blue-600 text-white shadow"
-                    : "bg-white/70 text-slate-700 border border-white/80"
-                }`}
-                type="button"
-              >
-                {hasUnreadSystem && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 shadow" />
+                        <button
+                          onClick={sendInlineMessage}
+                          disabled={sending || !composerText.trim()}
+                          className={
+                            "px-4 py-3 rounded-2xl text-sm font-semibold flex items-center gap-2 transition " +
+                            (sending || !composerText.trim()
+                              ? "bg-slate-300 text-slate-600 cursor-not-allowed"
+                              : "bg-indigo-600 text-white hover:bg-indigo-700 shadow")
+                          }
+                          type="button"
+                          title="Send"
+                        >
+                          <FiSend />
+                          {sending ? "Sending..." : "Send"}
+                        </button>
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 mt-2">
+                        No popup. This sends to the same threadKey.
+                      </p>
+                    </div>
+                  </>
                 )}
-
-                {systemUnreadCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
-                    {systemUnreadCount}
-                  </span>
-                )}
-
-                System ({systemItems.length})
-              </button>
+              </div>
             </div>
-          </div>
-
-          {/* ✅ Scrollable content area */}
-          <div className="flex-1 overflow-y-auto pr-2">
-            <div className="space-y-4 max-w-4xl">
-              {itemsToShow.length === 0 && (
-                <p className="text-center text-slate-600 text-lg bg-white/50 backdrop-blur-md p-6 rounded-2xl border border-white/70 shadow">
-                  No {activeTab === "DM" ? "direct messages" : "system notifications"} found.
-                </p>
-              )}
-
-              {activeTab === "DM"
-                ? itemsToShow.map((t) => renderThread(t))
-                : itemsToShow.map((n) => renderSystemCard(n))}
-            </div>
-          </div>
+          )}
         </div>
-
-        {replyOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
-            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
-              <h3 className="text-lg font-semibold mb-2 text-slate-900">
-                Reply Message
-              </h3>
-
-              <p className="text-xs text-slate-600 mb-2">
-                To:{" "}
-                <span className="font-semibold">{replyTarget?.otherUsername}</span>
-              </p>
-
-              <textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                rows={4}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-400"
-                placeholder="Write your message..."
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setReplyOpen(false);
-                    setReplyTarget(null);
-                    setReplyText("");
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                  type="button"
-                >
-                  Close
-                </button>
-
-                <button
-                  onClick={sendReply}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-                  type="button"
-                >
-                  Send
-                </button>
-              </div>
-
-              <p className="text-[11px] text-slate-500 mt-2">
-                Tip: You can keep sending messages without waiting for a reply.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+    </MainLayout>
   );
 }
-<<<<<<< HEAD
-=======
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d

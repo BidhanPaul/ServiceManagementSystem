@@ -24,7 +24,6 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
-    // ✅ Constructor injection (recommended)
     public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
     }
@@ -47,30 +46,50 @@ public class SecurityConfig {
                                 "/api/public/**",
                                 "/api-index",
                                 "/actuator/health",
-
-                                // Swagger
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
-
                                 "/error"
                         ).permitAll()
 
-                        // ✅ Make GET /api/requests public (list + by id + any GET under /api/requests/**)
+                        // ✅ Public: read-only requests
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
 
-                        // ✅ Keep write operations protected
+                        // ==========================================================
+                        // ✅ BIDDING (pull provider offers) - RP/PO/Admin
+                        // ==========================================================
+                        .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
+                        .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
+
+                        // ==========================================================
+                        // ✅ EVALUATION
+                        // ==========================================================
+                        .requestMatchers(HttpMethod.GET, "/api/requests/*/offers/evaluation")
+                        .hasAnyRole("PROJECT_MANAGER", "RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/requests/*/offers/evaluation/compute")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        // ==========================================================
+                        // ✅ CREATE ORDER (Final approve) - ONLY RP/Admin
+                        // ==========================================================
+                        // If your frontend calls: POST /api/requests/offers/{offerId}/order
+                        .requestMatchers(HttpMethod.POST, "/api/requests/offers/*/order")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        // If your frontend calls: POST /api/resource-planner/final-approve/{offerId}
+                        .requestMatchers(HttpMethod.POST, "/api/resource-planner/**")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        // ==========================================================
+                        // ✅ REQUEST WRITE OPERATIONS (PM)
+                        // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
 
                         // ✅ External refs
                         .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
-
-                        // ✅ PM whitelist
-                        .requestMatchers(HttpMethod.GET, "/api/pm-whitelist/validate").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/import").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/pm-whitelist/**").hasRole("ADMIN")
 
                         // ✅ Notifications
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
@@ -80,11 +99,37 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
 
+                        // ✅ Orders (PM + RP + Admin)
+                        .requestMatchers(HttpMethod.GET, "/api/orders/**")
+                        .hasAnyRole("PROJECT_MANAGER", "RESOURCE_PLANNER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/approve")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/reject")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/feedback")
+                        .hasAnyRole("PROJECT_MANAGER", "ADMIN")
+
+                        // ✅ Service Order change requests
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/substitution")
+                        .hasAnyRole("PROJECT_MANAGER", "SUPPLIER_REPRESENTATIVE", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/extension")
+                        .hasAnyRole("PROJECT_MANAGER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/change/approve")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/change/reject")
+                        .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
+
+
                         // ✅ Everything else requires login
                         .anyRequest().authenticated()
                 )
 
-                // for H2 console frames (dev)
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -95,10 +140,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-
-        // Add your deployed frontend URL later if needed
         config.setAllowedOrigins(List.of("http://localhost:3000"));
-
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 

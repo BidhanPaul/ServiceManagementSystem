@@ -1,14 +1,15 @@
 // src/components/ProcurementDashboard.js
-<<<<<<<<< Temporary merge branch 1
-import React, { useEffect, useState } from "react";
-=========
 import React, { useEffect, useMemo, useState } from "react";
->>>>>>>>> Temporary merge branch 2
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../layout/Sidebar";
 import TopNav from "./TopNav";
 import API from "../api/api";
 import { toast } from "react-toastify";
+
+const TAB = {
+  PENDING: "pending",
+  ALL: "all",
+};
 
 const ProcurementDashboard = () => {
   const navigate = useNavigate();
@@ -18,6 +19,12 @@ const ProcurementDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [offersByRequestId, setOffersByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
+
+  // ✅ Tabs (so no long scrolling)
+  const [activeTab, setActiveTab] = useState(TAB.PENDING);
+
+  // ✅ Search (UI only; no logic removed)
+  const [searchQuery, setSearchQuery] = useState("");
 
   // contact PM modal
   const [contactOpen, setContactOpen] = useState(false);
@@ -29,33 +36,6 @@ const ProcurementDashboard = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectTargetRequest, setRejectTargetRequest] = useState(null);
 
-<<<<<<<<< Temporary merge branch 1
-  const currentUsername = localStorage.getItem("username");
-
-  // -------- LOAD DATA --------
-
-  const loadProjectsFromMock = async () => {
-    try {
-      const res = await fetch(
-        "https://69233a5309df4a492324c022.mockapi.io/Projects"
-      );
-      const data = await res.json();
-      setProjects(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to load projects from mockapi", err);
-    }
-  };
-
-  const loadContractsFromMock = async () => {
-    try {
-      const res = await fetch(
-        "https://69233a5309df4a492324c022.mockapi.io/Contracts"
-      );
-      const data = await res.json();
-      setContracts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to load contracts from mockapi", err);
-=========
   const currentUsername = localStorage.getItem("username") || "";
   const myRole = localStorage.getItem("role") || "PROCUREMENT_OFFICER";
 
@@ -78,7 +58,6 @@ const ProcurementDashboard = () => {
     } catch (err) {
       console.error("Failed to load contracts (external)", err);
       setContracts([]);
->>>>>>>>> Temporary merge branch 2
     }
   };
 
@@ -88,10 +67,7 @@ const ProcurementDashboard = () => {
       setRequests(res.data || []);
     } catch (err) {
       console.error("Failed to load requests", err);
-<<<<<<<<< Temporary merge branch 1
-=========
       setRequests([]);
->>>>>>>>> Temporary merge branch 2
     }
   };
 
@@ -112,47 +88,27 @@ const ProcurementDashboard = () => {
       setOffersByRequestId(map);
     } catch (err) {
       console.error("Failed to load offers for requests", err);
-<<<<<<<<< Temporary merge branch 1
-=========
       setOffersByRequestId({});
->>>>>>>>> Temporary merge branch 2
     }
   };
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-<<<<<<<<< Temporary merge branch 1
-      await Promise.all([
-        loadProjectsFromMock(),
-        loadContractsFromMock(),
-        loadRequests(),
-      ]);
-=========
       await Promise.all([loadProjects(), loadContracts(), loadRequests()]);
->>>>>>>>> Temporary merge branch 2
       setLoading(false);
     };
     init();
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
-<<<<<<<<< Temporary merge branch 1
-    if (requests.length > 0) {
-      loadOffersForRequests(requests);
-    } else {
-      setOffersByRequestId({});
-    }
-  }, [requests]);
-
-  // -------- HELPERS --------
-=========
     if (requests.length > 0) loadOffersForRequests(requests);
     else setOffersByRequestId({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requests]);
 
   // ---------------- HELPERS ----------------
->>>>>>>>> Temporary merge branch 2
 
   const statusBadgeClass = (status) => {
     switch (status) {
@@ -173,32 +129,32 @@ const ProcurementDashboard = () => {
     }
   };
 
-  const projectLabel = (req) => {
-<<<<<<<<< Temporary merge branch 1
-    if (!req.projectIds || req.projectIds.length === 0) return "-";
-    const id = req.projectIds[0];
-    const proj = projects.find((p) => p.id === id);
-    if (!proj) return id;
-    return `${proj.customer} – ${proj.name}`;
+  // ✅ UI-only display helper (does not change logic/data)
+  const prettyStatus = (s) => {
+    if (!s) return "-";
+    return String(s)
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (m) => m.toUpperCase());
   };
 
-  const contractLabel = (req) => {
-    if (!req.contractIds || req.contractIds.length === 0) return "-";
-    const id = req.contractIds[0];
-    const c = contracts.find((x) => x.id === id);
-    if (!c) return id;
-    return `${c.supplier} – ${c.domain}`;
-  };
-
-  const pendingRequests = requests.filter((r) => r.status === "IN_REVIEW");
-
-  const totalOffers = Object.values(offersByRequestId).reduce(
-    (acc, arr) => acc + (arr ? arr.length : 0),
-    0
+  // ✅ Never-overlap status pill
+  const StatusPill = ({ status }) => (
+    <span
+      title={status || ""}
+      className={[
+        "inline-flex items-center gap-1.5",
+        "px-2.5 py-0.5 rounded-full text-[11px] font-medium",
+        "max-w-full min-w-0 overflow-hidden whitespace-nowrap",
+        statusBadgeClass(status),
+      ].join(" ")}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 flex-shrink-0" />
+      <span className="min-w-0 truncate">{prettyStatus(status)}</span>
+    </span>
   );
 
-  // -------- ACTIONS --------
-=========
+  const projectLabel = (req) => {
     const id = req?.projectId;
     if (!id) return "-";
 
@@ -243,8 +199,52 @@ const ProcurementDashboard = () => {
     [offersByRequestId]
   );
 
+  // ✅ FILTERED LISTS (UI only; keeps all logic intact)
+  const filteredPendingRequests = useMemo(() => {
+    if (!searchQuery.trim()) return pendingRequests;
+    const q = searchQuery.toLowerCase();
+
+    return pendingRequests.filter((r) =>
+      [
+        r.title,
+        r.status,
+        r.type,
+        r.requestedByUsername,
+        projectLabel(r),
+        contractLabel(r),
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q))
+    );
+  }, [pendingRequests, searchQuery]); // projectLabel/contractLabel use state, but UI-only safe
+
+  const filteredRequests = useMemo(() => {
+    if (!searchQuery.trim()) return requests;
+    const q = searchQuery.toLowerCase();
+
+    return requests.filter((r) =>
+      [
+        r.title,
+        r.status,
+        r.type,
+        r.requestedByUsername,
+        projectLabel(r),
+        contractLabel(r),
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q))
+    );
+  }, [requests, searchQuery]);
+
+  // If user is on Pending tab but there are none, auto-switch to All tab
+  useEffect(() => {
+    if (!loading && activeTab === TAB.PENDING && pendingRequests.length === 0) {
+      setActiveTab(TAB.ALL);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, pendingRequests.length]);
+
   // ---------------- ACTIONS ----------------
->>>>>>>>> Temporary merge branch 2
 
   const openContactPm = (req) => {
     if (!req.requestedByUsername) {
@@ -256,9 +256,8 @@ const ProcurementDashboard = () => {
     setContactOpen(true);
   };
 
-<<<<<<<<< Temporary merge branch 1
   const submitContactPm = async () => {
-    if (!contactTargetRequest || !contactTargetRequest.requestedByUsername) {
+    if (!contactTargetRequest?.requestedByUsername) {
       toast.error("No valid PM to contact.");
       return;
     }
@@ -267,10 +266,15 @@ const ProcurementDashboard = () => {
       return;
     }
 
+    const pm = contactTargetRequest.requestedByUsername;
+    const from = currentUsername;
+    const reqId = contactTargetRequest.id;
+
     try {
       await API.post(
-        `/notifications/user/${contactTargetRequest.requestedByUsername}`,
-        `Message from Procurement Officer about request "${contactTargetRequest.title}": ${contactMessage}`
+        `/notifications/user/${pm}`,
+        `DM:from=${from};to=${pm};req=${reqId}; ${contactMessage}`,
+        { headers: { "Content-Type": "text/plain" } }
       );
 
       toast.success("Message sent to Project Manager.");
@@ -278,46 +282,10 @@ const ProcurementDashboard = () => {
       setContactTargetRequest(null);
       setContactMessage("");
     } catch (err) {
-      console.error("Failed to send PM message", err);
+      console.error("Failed to send PM message", err?.response || err);
       toast.error("Failed to send message to PM.");
     }
   };
-=========
-  // ✅ uses existing notification endpoint (NO /messages/send)
-const submitContactPm = async () => {
-  if (!contactTargetRequest?.requestedByUsername) {
-    toast.error("No valid PM to contact.");
-    return;
-  }
-  if (!contactMessage.trim()) {
-    toast.error("Please write a message for the PM.");
-    return;
-  }
-
-  const pm = contactTargetRequest.requestedByUsername;
-  const from = currentUsername; // make sure currentUsername exists in this file
-  const reqId = contactTargetRequest.id;
-
-  try {
-    await API.post(
-      `/notifications/user/${pm}`,
-      `DM:from=${from};to=${pm};req=${reqId}; ${contactMessage}`,
-      { headers: { "Content-Type": "text/plain" } }
-    );
-
-    toast.success("Message sent to Project Manager.");
-    setContactOpen(false);
-    setContactTargetRequest(null);
-    setContactMessage("");
-  } catch (err) {
-    console.error("Failed to send PM message", err?.response || err);
-    toast.error("Failed to send message to PM.");
-  }
-};
-
-
-
->>>>>>>>> Temporary merge branch 2
 
   const openReject = (req) => {
     setRejectTargetRequest(req);
@@ -333,26 +301,15 @@ const submitContactPm = async () => {
     }
 
     try {
-<<<<<<<<< Temporary merge branch 1
-      await API.put(
-        `/requests/${rejectTargetRequest.id}/reject`,
-        rejectReason,
-        {
-          headers: {
-            "Content-Type": "text/plain",
-          },
-        }
-      );
-=========
       await API.put(`/requests/${rejectTargetRequest.id}/reject`, rejectReason, {
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
       });
->>>>>>>>> Temporary merge branch 2
       toast.success("Request rejected.");
       setRejectOpen(false);
       setRejectTargetRequest(null);
       setRejectReason("");
       loadRequests();
+      setActiveTab(TAB.PENDING);
     } catch (err) {
       console.error("Failed to reject request", err);
       toast.error("Failed to reject request.");
@@ -364,45 +321,59 @@ const submitContactPm = async () => {
       await API.put(`/requests/${req.id}/approve`);
       toast.success("Request approved for bidding.");
       loadRequests();
+      setActiveTab(TAB.PENDING);
     } catch (err) {
       console.error("Failed to approve request", err);
       toast.error("Failed to approve request.");
     }
   };
 
-<<<<<<<<< Temporary merge branch 1
-  // -------- RENDER --------
+  // ---------------- SMALL UI: Tabs ----------------
+  const TabButton = ({ id, label, count }) => {
+    const isActive = activeTab === id;
+    return (
+      <button
+        type="button"
+        onClick={() => setActiveTab(id)}
+        className={[
+          "px-3.5 py-2 rounded-xl text-sm font-semibold transition ring-1",
+          isActive
+            ? "bg-slate-900 text-white ring-slate-900"
+            : "bg-white/80 text-slate-700 ring-slate-200 hover:bg-white",
+        ].join(" ")}
+      >
+        <span className="mr-2">{label}</span>
+        <span
+          className={[
+            "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+            isActive ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700",
+          ].join(" ")}
+        >
+          {count}
+        </span>
+      </button>
+    );
+  };
 
-  return (
-    <div className="flex">
-=========
   // ---------------- RENDER ----------------
-
   return (
     <div className="flex min-h-screen">
->>>>>>>>> Temporary merge branch 2
       <Sidebar />
 
       <div className="flex-1 min-h-screen bg-gradient-to-b from-blue-100 via-sky-100 to-blue-300">
-        <div className="max-w-6xl mx-auto px-4 py-6 md:px-6 md:py-8">
-          <TopNav />
+        <div className="max-w-6xl mx-auto px-4 py-6 md:px-6 md:py-8 pb-10">
+          {/* ✅ Sticky TopNav */}
+          <div className="sticky top-0 z-50">
+            <TopNav />
+          </div>
 
-<<<<<<<<< Temporary merge branch 1
-          {/* Page header */}
-=========
->>>>>>>>> Temporary merge branch 2
           <header className="mt-4 mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
+            <div className="min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
                 Procurement Officer Panel
               </h1>
               <p className="text-sm text-slate-600 mt-1">
-<<<<<<<<< Temporary merge branch 1
-                Review, approve and oversee service requests and supplier
-                offers.
-=========
                 Review, approve and oversee service requests and supplier offers.
->>>>>>>>> Temporary merge branch 2
               </p>
             </div>
             <div className="mt-2 md:mt-0 text-xs text-slate-500">
@@ -415,8 +386,6 @@ const submitContactPm = async () => {
 
           {/* Overview cards */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
-<<<<<<<<< Temporary merge branch 1
-            {/* Pending approvals */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-blue-50 text-blue-700">
                 <svg
@@ -431,17 +400,10 @@ const submitContactPm = async () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-=========
-            <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
-              <div className="p-3 rounded-2xl bg-blue-50 text-blue-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M12 6v6l3 3" strokeLinecap="round" strokeLinejoin="round" />
->>>>>>>>> Temporary merge branch 2
                   <circle cx="12" cy="12" r="9" />
                 </svg>
               </div>
-              <div>
-<<<<<<<<< Temporary merge branch 1
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Pending approvals
                 </p>
@@ -449,12 +411,11 @@ const submitContactPm = async () => {
                   {pendingRequests.length}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Requests currently awaiting your decision
+                  Awaiting your decision
                 </p>
               </div>
             </div>
 
-            {/* All requests */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-sky-50 text-sky-700">
                 <svg
@@ -472,7 +433,7 @@ const submitContactPm = async () => {
                   />
                 </svg>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Service requests
                 </p>
@@ -480,12 +441,11 @@ const submitContactPm = async () => {
                   {requests.length}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Total requests in the system
+                  Total requests in system
                 </p>
               </div>
             </div>
 
-            {/* Projects */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-700">
                 <svg
@@ -495,38 +455,12 @@ const submitContactPm = async () => {
                   strokeWidth="2"
                   viewBox="0 0 24 24"
                 >
-=========
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending approvals</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{pendingRequests.length}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Awaiting your decision</p>
-              </div>
-            </div>
-
-            <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
-              <div className="p-3 rounded-2xl bg-sky-50 text-sky-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Service requests</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{requests.length}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Total requests in system</p>
-              </div>
-            </div>
-
-            <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
-              <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
->>>>>>>>> Temporary merge branch 2
                   <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
                 </svg>
               </div>
-              <div>
-<<<<<<<<< Temporary merge branch 1
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Projects (Mock API)
+                  Projects (External)
                 </p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">
                   {projects.length}
@@ -537,7 +471,6 @@ const submitContactPm = async () => {
               </div>
             </div>
 
-            {/* Offers */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-700">
                 <svg
@@ -554,7 +487,7 @@ const submitContactPm = async () => {
                   />
                 </svg>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Supplier offers
                 </p>
@@ -562,29 +495,89 @@ const submitContactPm = async () => {
                   {totalOffers}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Offers received across all requests
+                  Offers received across requests
                 </p>
-=========
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Projects (External)</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{projects.length}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Available project references</p>
-              </div>
-            </div>
-
-            <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
-              <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Supplier offers</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{totalOffers}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Offers received across requests</p>
->>>>>>>>> Temporary merge branch 2
               </div>
             </div>
           </section>
+
+          {/* ✅ Sticky Tabs + Search row */}
+          <div className="sticky top-[88px] z-40 mb-4">
+            <div className="bg-white/70 backdrop-blur rounded-2xl p-3 border border-slate-100 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                {/* Tabs */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <TabButton
+                    id={TAB.PENDING}
+                    label="Pending approvals"
+                    count={pendingRequests.length}
+                  />
+                  <TabButton
+                    id={TAB.ALL}
+                    label="All requests"
+                    count={requests.length}
+                  />
+                </div>
+
+                {/* Search */}
+                <div className="flex items-center gap-2 w-full md:w-[420px]">
+                  <div className="relative w-full">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search title, project, contract, status..."
+                      className="w-full rounded-xl border border-slate-200 bg-white/90 pl-10 pr-10 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:border-sky-400"
+                    />
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path
+                        d="M21 21l-4.3-4.3"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+
+                    {/* Clear button */}
+                    {searchQuery.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs
+                                   text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition"
+                        title="Clear search"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Optional: results hint (small + helpful) */}
+              {searchQuery.trim() && (
+                <div className="mt-2 text-[11px] text-slate-500">
+                  Showing{" "}
+                  <span className="font-semibold text-slate-700">
+                    {activeTab === TAB.PENDING
+                      ? filteredPendingRequests.length
+                      : filteredRequests.length}
+                  </span>{" "}
+                  result(s) for{" "}
+                  <span className="font-semibold text-slate-700">
+                    “{searchQuery.trim()}”
+                  </span>
+                  .
+                </div>
+              )}
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -592,337 +585,251 @@ const submitContactPm = async () => {
             </div>
           ) : (
             <>
-              {/* Requests waiting for approval */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                      Requests Waiting for Approval
-                    </h2>
-                    <p className="text-xs text-slate-500">
-<<<<<<<<< Temporary merge branch 1
-                      These requests have been submitted by Project Managers and
-                      require Procurement approval.
-=========
-                      Submitted by Project Managers, waiting for your approval.
->>>>>>>>> Temporary merge branch 2
-                    </p>
+              {/* ===== TAB CONTENT ===== */}
+
+              {activeTab === TAB.PENDING && (
+                <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="min-w-0">
+                      <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                        Requests Waiting for Approval
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Submitted by Project Managers, waiting for your approval.
+                      </p>
+                    </div>
+                    {pendingRequests.length > 0 && (
+                      <span className="hidden md:inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 text-xs font-medium">
+                        {pendingRequests.length} pending
+                      </span>
+                    )}
                   </div>
-                  {pendingRequests.length > 0 && (
-                    <span className="hidden md:inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 text-xs font-medium">
-                      {pendingRequests.length} pending
-                    </span>
+
+                  {filteredPendingRequests.length === 0 ? (
+                    <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                      {searchQuery.trim()
+                        ? "No requests match your search."
+                        : "No requests currently waiting for your approval."}
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto lg:overflow-x-hidden rounded-xl border border-slate-100">
+                      <table className="w-full text-sm table-fixed">
+                        <thead className="bg-slate-50/80">
+                          <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
+                            <th className="py-2.5 px-3 w-[34%]">Title</th>
+                            <th className="py-2.5 px-3 w-[28%]">Project</th>
+                            <th className="py-2.5 px-3 w-[20%] hidden lg:table-cell">
+                              Contract
+                            </th>
+                            <th className="py-2.5 px-3 w-[12%] hidden xl:table-cell">
+                              Requested By
+                            </th>
+                            <th className="py-2.5 px-3 w-[12%]">Status</th>
+                            <th className="py-2.5 px-3 w-[14%] text-right">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {filteredPendingRequests.map((r) => (
+                            <tr
+                              key={r.id}
+                              className="hover:bg-slate-50/60 transition-colors"
+                            >
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-medium text-slate-900 text-sm truncate">
+                                    {r.title}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 truncate">
+                                    {r.type} • {r.roles?.length || 0} role(s)
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden">
+                                <span className="block truncate">
+                                  {projectLabel(r)}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden hidden lg:table-cell">
+                                <span className="block truncate">
+                                  {contractLabel(r)}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden hidden xl:table-cell">
+                                <span className="block truncate">
+                                  {r.requestedByUsername || "-"}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <StatusPill status={r.status} />
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <div className="flex justify-end flex-wrap gap-1.5">
+                                  <button
+                                    onClick={() => navigate(`/requests/${r.id}`)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                                    type="button"
+                                  >
+                                    View
+                                  </button>
+                                  <button
+                                    onClick={() => openContactPm(r)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                                    type="button"
+                                  >
+                                    Contact PM
+                                  </button>
+                                  <button
+                                    onClick={() => approveRequest(r)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                                    type="button"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => openReject(r)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                    type="button"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </div>
+                </section>
+              )}
 
-                {pendingRequests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    No requests currently waiting for your approval.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-100">
-<<<<<<<<< Temporary merge branch 1
-                    <table className="w-full text-sm">
-=========
-                    <table className="w-full text-sm min-w-[900px]">
->>>>>>>>> Temporary merge branch 2
-                      <thead className="bg-slate-50/80">
-                        <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
-                          <th className="py-2.5 px-3">Title</th>
-                          <th className="py-2.5 px-3">Project</th>
-                          <th className="py-2.5 px-3">Contract</th>
-                          <th className="py-2.5 px-3">Requested By</th>
-                          <th className="py-2.5 px-3">Status</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {pendingRequests.map((r) => (
-<<<<<<<<< Temporary merge branch 1
-                          <tr
-                            key={r.id}
-                            className="hover:bg-slate-50/60 transition-colors"
-                          >
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-900 text-sm">
-                                  {r.title}
-                                </span>
-=========
-                          <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-900 text-sm">{r.title}</span>
->>>>>>>>> Temporary merge branch 2
-                                <span className="text-[11px] text-slate-500">
-                                  {r.type} • {r.roles?.length || 0} role(s)
-                                </span>
-                              </div>
-                            </td>
-<<<<<<<<< Temporary merge branch 1
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {projectLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {contractLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {r.requestedByUsername || "-"}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <span
-                                className={
-                                  "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
-                                  statusBadgeClass(r.status)
-                                }
-                              >
-=========
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{projectLabel(r)}</td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{contractLabel(r)}</td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.requestedByUsername || "-"}</td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <span className={"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " + statusBadgeClass(r.status)}>
->>>>>>>>> Temporary merge branch 2
-                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                {r.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex justify-end flex-wrap gap-1.5">
-                                <button
-                                  onClick={() => navigate(`/requests/${r.id}`)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-                                >
-                                  View
-                                </button>
-                                <button
-                                  onClick={() => openContactPm(r)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-                                >
-                                  Contact PM
-                                </button>
-                                <button
-                                  onClick={() => approveRequest(r)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => openReject(r)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {activeTab === TAB.ALL && (
+                <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="min-w-0">
+                      <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                        All Service Requests
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Overview across all projects and contracts.
+                      </p>
+                    </div>
                   </div>
-                )}
-              </section>
 
-              {/* All Requests */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                      All Service Requests
-                    </h2>
-<<<<<<<<< Temporary merge branch 1
-                    <p className="text-xs text-slate-500">
-                      Overview of all requests across projects and contracts.
+                  {filteredRequests.length === 0 ? (
+                    <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                      {searchQuery.trim()
+                        ? "No requests match your search."
+                        : "No service requests in the system."}
                     </p>
-                  </div>
-                </div>
-=========
-                    <p className="text-xs text-slate-500">Overview across all projects and contracts.</p>
-                  </div>
-                </div>
-
->>>>>>>>> Temporary merge branch 2
-                {requests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    No service requests in the system.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-100">
-<<<<<<<<< Temporary merge branch 1
-                    <table className="w-full text-sm">
-=========
-                    <table className="w-full text-sm min-w-[1000px]">
->>>>>>>>> Temporary merge branch 2
-                      <thead className="bg-slate-50/80">
-                        <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
-                          <th className="py-2.5 px-3">Title</th>
-                          <th className="py-2.5 px-3">Type</th>
-                          <th className="py-2.5 px-3">Status</th>
-                          <th className="py-2.5 px-3">Project</th>
-                          <th className="py-2.5 px-3">Contract</th>
-                          <th className="py-2.5 px-3">Requested By</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {requests.map((r) => (
-<<<<<<<<< Temporary merge branch 1
-                          <tr
-                            key={r.id}
-                            className="hover:bg-slate-50/60 transition-colors"
-                          >
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-900 text-sm">
-                                  {r.title}
-                                </span>
-                                <span className="text-[11px] text-slate-500">
-                                  {r.roles?.length || 0} role(s)
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {r.type}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <span
-                                className={
-                                  "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
-                                  statusBadgeClass(r.status)
-                                }
-                              >
-=========
-                          <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-900 text-sm">{r.title}</span>
-                                <span className="text-[11px] text-slate-500">{r.roles?.length || 0} role(s)</span>
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.type}</td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <span className={"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " + statusBadgeClass(r.status)}>
->>>>>>>>> Temporary merge branch 2
-                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                {r.status}
-                              </span>
-                            </td>
-<<<<<<<<< Temporary merge branch 1
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {projectLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {contractLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {r.requestedByUsername || "-"}
-                            </td>
-=========
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{projectLabel(r)}</td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{contractLabel(r)}</td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.requestedByUsername || "-"}</td>
->>>>>>>>> Temporary merge branch 2
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex justify-end">
-                                <button
-                                  onClick={() => navigate(`/requests/${r.id}`)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-                                >
-                                  View
-                                </button>
-                              </div>
-                            </td>
+                  ) : (
+                    <div className="overflow-x-auto lg:overflow-x-hidden rounded-xl border border-slate-100">
+                      <table className="w-full text-sm table-fixed">
+                        <thead className="bg-slate-50/80">
+                          <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
+                            <th className="py-2.5 px-3 w-[34%]">Title</th>
+                            <th className="py-2.5 px-3 w-[10%] hidden lg:table-cell">
+                              Type
+                            </th>
+                            <th className="py-2.5 px-3 w-[12%]">Status</th>
+                            <th className="py-2.5 px-3 w-[26%]">Project</th>
+                            <th className="py-2.5 px-3 w-[18%] hidden xl:table-cell">
+                              Contract
+                            </th>
+                            <th className="py-2.5 px-3 w-[14%] hidden xl:table-cell">
+                              Requested By
+                            </th>
+                            <th className="py-2.5 px-3 w-[10%] text-right">
+                              Actions
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-<<<<<<<<< Temporary merge branch 1
+                        </thead>
 
-              {/* Offers per request */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                      Offers per Request
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Quick view of how many supplier offers each request has.
-                    </p>
-                  </div>
-                </div>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {filteredRequests.map((r) => (
+                            <tr
+                              key={r.id}
+                              className="hover:bg-slate-50/60 transition-colors"
+                            >
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-medium text-slate-900 text-sm truncate">
+                                    {r.title}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 truncate">
+                                    {r.roles?.length || 0} role(s)
+                                  </span>
+                                </div>
+                              </td>
 
-                {requests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    No requests → no offers yet.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {requests.map((req) => {
-                      const offers = offersByRequestId[req.id] || [];
-                      return (
-                        <div
-                          key={req.id}
-                          className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
-                        >
-                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
-                            <div>
-                              <p className="font-semibold text-slate-900 text-sm">
-                                {req.title}
-                              </p>
-                              <p className="text-[11px] text-slate-500">
-                                {projectLabel(req)} • {contractLabel(req)}
-                              </p>
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-white text-slate-700 border border-slate-200 px-2.5 py-1 text-[11px] font-medium">
-                              {offers.length} offer(s)
-                            </span>
-                          </div>
-                          {offers.length === 0 ? (
-                            <p className="text-xs text-slate-500">
-                              No offers submitted yet.
-                            </p>
-                          ) : (
-                            <ul className="text-xs text-slate-700 list-disc ml-4 space-y-0.5">
-                              {offers.map((o) => (
-                                <li key={o.id}>
-                                  <span className="font-medium">
-                                    {o.specialistName || "Unnamed"}
-                                  </span>{" "}
-                                  – {o.supplierName} ({o.dailyRate} €/day)
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-=========
->>>>>>>>> Temporary merge branch 2
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden hidden lg:table-cell">
+                                <span className="block truncate">{r.type}</span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <StatusPill status={r.status} />
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden">
+                                <span className="block truncate">
+                                  {projectLabel(r)}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden hidden xl:table-cell">
+                                <span className="block truncate">
+                                  {contractLabel(r)}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 min-w-0 overflow-hidden hidden xl:table-cell">
+                                <span className="block truncate">
+                                  {r.requestedByUsername || "-"}
+                                </span>
+                              </td>
+
+                              <td className="py-2.5 px-3 align-middle min-w-0 overflow-hidden">
+                                <div className="flex justify-end">
+                                  <button
+                                    onClick={() => navigate(`/requests/${r.id}`)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                                    type="button"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
             </>
           )}
 
           {/* Contact PM modal */}
           {contactOpen && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40 px-3">
               <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
                 <h3 className="text-lg font-semibold mb-2 text-slate-900">
                   Contact Project Manager
                 </h3>
                 <p className="text-xs text-slate-600 mb-2">
                   Request:{" "}
-<<<<<<<<< Temporary merge branch 1
                   <span className="font-semibold">
                     {contactTargetRequest?.title}
                   </span>
-=========
-                  <span className="font-semibold">{contactTargetRequest?.title}</span>
->>>>>>>>> Temporary merge branch 2
                 </p>
                 <textarea
                   value={contactMessage}
@@ -935,12 +842,14 @@ const submitContactPm = async () => {
                   <button
                     onClick={() => setContactOpen(false)}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    type="button"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={submitContactPm}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    type="button"
                   >
                     Send message
                   </button>
@@ -951,42 +860,36 @@ const submitContactPm = async () => {
 
           {/* Reject modal */}
           {rejectOpen && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40 px-3">
               <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-md border border-slate-100">
                 <h3 className="text-lg font-semibold mb-2 text-slate-900">
                   Reject Service Request
                 </h3>
                 <p className="text-xs text-slate-600 mb-2">
                   Request:{" "}
-<<<<<<<<< Temporary merge branch 1
                   <span className="font-semibold">
                     {rejectTargetRequest?.title}
                   </span>
-=========
-                  <span className="font-semibold">{rejectTargetRequest?.title}</span>
->>>>>>>>> Temporary merge branch 2
                 </p>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={4}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-red-400"
-<<<<<<<<< Temporary merge branch 1
-                  placeholder="Provide a clear reason for the rejection (this will be visible to the Project Manager)."
-=========
                   placeholder="Provide a clear reason for the rejection (visible to the Project Manager)."
->>>>>>>>> Temporary merge branch 2
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setRejectOpen(false)}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    type="button"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={submitReject}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    type="button"
                   >
                     Confirm rejection
                   </button>

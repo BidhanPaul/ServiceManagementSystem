@@ -7,6 +7,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import edu.frau.service.Service.Management.dto.OfferEvaluationDTO;
+import edu.frau.service.Service.Management.service.OfferEvaluationService;
+
 
 import java.util.List;
 
@@ -18,10 +21,18 @@ public class ServiceRequestController {
     private final RequestService requestService;
     private final UserRepository userRepository;
 
+    private final OfferEvaluationService offerEvaluationService;
+
+
+
+
     // ✅ Constructor injection only (NO @Autowired field injection)
-    public ServiceRequestController(RequestService requestService, UserRepository userRepository) {
+    public ServiceRequestController(RequestService requestService,
+                                    UserRepository userRepository,
+                                    OfferEvaluationService offerEvaluationService) {
         this.requestService = requestService;
         this.userRepository = userRepository;
+        this.offerEvaluationService = offerEvaluationService;
     }
 
     @GetMapping
@@ -119,6 +130,13 @@ public class ServiceRequestController {
         return ResponseEntity.ok(requestService.createServiceOrderFromOffer(offerId, "system"));
     }
 
+    @PostMapping("/{id}/pull-provider-offers")
+    public ResponseEntity<String> pullProviderOffers(@PathVariable Long id) {
+        requestService.pullProviderOffers(id);
+        return ResponseEntity.ok("Pulled provider offers successfully.");
+    }
+
+
     // ✅ ADMIN delete ANY request regardless of status
     @DeleteMapping("/{id}/admin")
     public ResponseEntity<Void> adminDelete(@PathVariable Long id) {
@@ -138,4 +156,21 @@ public class ServiceRequestController {
         boolean ok = requestService.adminDeleteRequest(id);
         return ok ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
+
+    // ✅ Get evaluation table (sorted, ranked)
+    @GetMapping("/{id}/offers/evaluation")
+    public ResponseEntity<List<OfferEvaluationDTO>> getOfferEvaluation(@PathVariable Long id) {
+        return ResponseEntity.ok(offerEvaluationService.getEvaluationsForRequest(id));
+    }
+
+    // ✅ Compute evaluation (RP or system can trigger)
+    @PostMapping("/{id}/offers/evaluation/compute")
+    public ResponseEntity<List<OfferEvaluationDTO>> computeOfferEvaluation(@PathVariable Long id) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = (auth != null && auth.isAuthenticated()) ? auth.getName() : "system";
+
+        return ResponseEntity.ok(offerEvaluationService.computeEvaluationsForRequest(id, username));
+    }
+
 }

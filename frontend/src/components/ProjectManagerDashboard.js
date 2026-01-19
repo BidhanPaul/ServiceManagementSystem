@@ -40,9 +40,8 @@ const ProjectManagerDashboard = () => {
   // Prevent duplicate initial loads (React 18 StrictMode runs effects twice in dev)
   const didInitRef = useRef(false);
 
-  // Modal for viewing offers in detail
-  const [offerModalOpen, setOfferModalOpen] = useState(false);
-  const [offerModalRequest, setOfferModalRequest] = useState(null);
+  // Tabs (UI only)
+  const [activeTab, setActiveTab] = useState("overview");
 
   // ---------- LOAD DATA ----------
   const loadProjects = async () => {
@@ -77,8 +76,6 @@ const ProjectManagerDashboard = () => {
 
   const loadOffersForMyRequests = async (myReqs) => {
     try {
-      // If many requests, this will still work, but can be heavy.
-      // (Later optimization: backend endpoint to fetch offers for a list of requestIds)
       const promises = myReqs.map((r) =>
         API.get(`/requests/${r.id}/offers`).then((res) => ({
           requestId: r.id,
@@ -149,19 +146,25 @@ const ProjectManagerDashboard = () => {
     }
   };
 
-const projectLabel = (req) => {
-  if (req?.projectId) {
-    return `${req.projectId} – ${req.projectName || ""}`;
-  }
-  return "-";
-};
+  const projectLabel = (req) => {
+    if (req?.projectId) {
+      return `${req.projectId} – ${req.projectName || ""}`;
+    }
+    return "-";
+  };
 
-const contractLabel = (req) => {
-  if (req?.contractId) {
-    return `${req.contractSupplier || ""} – ${req.contractId}`;
-  }
-  return "-";
-};
+  const contractLabel = (req) => {
+    if (req?.contractId) {
+      return `${req.contractSupplier || ""} – ${req.contractId}`;
+    }
+    return "-";
+  };
+
+  // ✅ NO POPUP: open full offers in RequestDetails
+  const openOffersFullView = (req) => {
+    if (!req?.id) return;
+    navigate(`/requests/${req.id}?tab=offers`);
+  };
 
   // ---------- SMALL ANALYTICS ----------
   const statusCounts = useMemo(() => {
@@ -171,9 +174,7 @@ const contractLabel = (req) => {
     }, {});
   }, [requests]);
 
-  // keep chart labels stable + avoid huge unreadable bars
   const barLabels = useMemo(() => {
-    // show latest 12 only (UI readable)
     const latest = [...(requests || [])].slice(-12);
     return latest.map((r) => r.title);
   }, [requests]);
@@ -217,16 +218,6 @@ const contractLabel = (req) => {
     [barLabels, barValues]
   );
 
-  const openOffersModal = (req) => {
-    setOfferModalRequest(req);
-    setOfferModalOpen(true);
-  };
-
-  const closeOffersModal = () => {
-    setOfferModalOpen(false);
-    setOfferModalRequest(null);
-  };
-
   // ---------- NO USER CASE ----------
   if (!currentUsername) {
     return (
@@ -235,18 +226,17 @@ const contractLabel = (req) => {
           <Sidebar />
         </div>
         <div className="flex-1 bg-gradient-to-b from-blue-100 via-sky-100 to-blue-300">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
-            <TopNav />
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-6">
+            <div className="sticky top-0 z-40">
+              <TopNav />
+            </div>
+
             <div className="bg-white/90 rounded-2xl shadow-sm border border-red-100 p-6 mt-6">
               <h1 className="text-xl font-semibold text-red-600 mb-2">
                 No Project Manager logged in
               </h1>
               <p className="text-sm text-slate-700">
-                Please make sure you set{" "}
-                <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">
-                  localStorage.setItem("username", "pm1")
-                </code>{" "}
-                or another Project Manager username.
+                Please make sure your username exists in local storage.
               </p>
             </div>
           </div>
@@ -254,6 +244,23 @@ const contractLabel = (req) => {
       </div>
     );
   }
+
+  // ---------- Tabs UI ----------
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "my_requests", label: "My Requests" },
+    { id: "all_requests", label: "All Requests" },
+    { id: "offers", label: "Offers" },
+  ];
+
+  const tabBtnClass = (isActive) =>
+    [
+      "px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition",
+      "ring-1 ring-slate-200",
+      isActive
+        ? "bg-slate-900 text-white"
+        : "bg-white/80 text-slate-700 hover:bg-white",
+    ].join(" ");
 
   // ---------- RENDER ----------
   return (
@@ -263,18 +270,20 @@ const contractLabel = (req) => {
       </div>
 
       <div className="flex-1 bg-gradient-to-b from-blue-100 via-sky-100 to-blue-300">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
-          <TopNav />
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-6 pb-10">
+          {/* ✅ Sticky top nav */}
+          <div className="sticky top-0 z-50">
+            <TopNav />
+          </div>
 
           {/* Header */}
-          <header className="mt-2 sm:mt-4 mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <header className="mt-3 mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
                 Project Manager Panel
               </h1>
               <p className="text-sm text-slate-600 mt-1">
-                Create and track service requests for your projects and monitor
-                supplier offers.
+                Create and track service requests for your projects and monitor supplier offers.
               </p>
             </div>
 
@@ -288,144 +297,96 @@ const contractLabel = (req) => {
               <button
                 onClick={() => navigate("/requests")}
                 className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-md hover:bg-blue-700 transition-colors"
+                type="button"
               >
                 + Create Service Request
               </button>
             </div>
           </header>
 
-          {/* Overview cards */}
+          {/* ✅ Sticky Tabs (stays visible while scrolling) */}
+          <div className="sticky top-[88px] z-40 mb-6">
+            <div className="bg-white/80 backdrop-blur rounded-2xl p-2 border border-slate-100 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                {tabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={tabBtnClass(activeTab === t.id)}
+                    onClick={() => setActiveTab(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary cards */}
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            {/* Projects */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-sky-50 text-sky-700 rounded-2xl">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path d="M3 7h18M3 12h18M3 17h18" strokeLinecap="round" />
                 </svg>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Projects (Published API)
+                  Projects
                 </p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">
                   {projects.length}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Available project references
-                </p>
               </div>
             </div>
 
-            {/* Contracts */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-sky-50 text-sky-700 rounded-2xl">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <rect x="3" y="4" width="18" height="16" rx="2" />
                 </svg>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Contracts (Published API)
+                  Contracts
                 </p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">
                   {contracts.length}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Framework & preferred suppliers
-                </p>
               </div>
             </div>
 
-            {/* My Requests */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-blue-50 text-blue-700 rounded-2xl">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path d="M12 6v6l4 2" strokeLinecap="round" />
                   <circle cx="12" cy="12" r="9" />
                 </svg>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  My Service Requests
+                  My Requests
                 </p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">
                   {myRequests.length}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Requests created under your username
-                </p>
               </div>
             </div>
 
-            {/* All Requests */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-indigo-50 text-indigo-700 rounded-2xl">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="9" />
                   <path d="M8 12h8M12 8v8" strokeLinecap="round" />
                 </svg>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  All Service Requests
+                  All Requests
                 </p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">
                   {requests.length}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Total requests across all PMs
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Mini charts row */}
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 overflow-hidden">
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">
-                Requests by Status
-              </h2>
-              <p className="text-xs text-slate-500 mb-2">
-                Distribution of all service requests across lifecycle statuses.
-              </p>
-              <div className="h-52 flex items-center justify-center">
-                <Pie data={pieData} />
-              </div>
-            </div>
-
-            <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 overflow-hidden">
-              <h2 className="text-sm font-semibold text-slate-900 mb-1">
-                Roles Requested (Latest 12 Requests)
-              </h2>
-              <p className="text-xs text-slate-500 mb-2">
-                Keeps the chart readable on smaller screens.
-              </p>
-              <div className="h-52 flex items-center justify-center">
-                <Bar data={barData} />
               </div>
             </div>
           </section>
@@ -436,10 +397,44 @@ const contractLabel = (req) => {
             </div>
           ) : (
             <>
-              {/* My Requests */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div>
+              {/* OVERVIEW TAB */}
+              {activeTab === "overview" && (
+                <>
+                  <section className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+                    <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 overflow-hidden">
+                      <h2 className="text-sm font-semibold text-slate-900 mb-1">
+                        Requests by Status
+                      </h2>
+                      <div className="h-52 flex items-center justify-center">
+                        <Pie data={pieData} />
+                      </div>
+                    </div>
+
+                    <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 overflow-hidden">
+                      <h2 className="text-sm font-semibold text-slate-900 mb-1">
+                        Roles Requested (Latest 12 Requests)
+                      </h2>
+                      <div className="h-52 flex items-center justify-center">
+                        <Bar data={barData} />
+                      </div>
+                    </div>
+                  </section>
+
+                  <div className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
+                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                      Quick Tips
+                    </h2>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Tabs are sticky now — you can switch sections without scrolling back up.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* MY REQUESTS TAB */}
+              {activeTab === "my_requests" && (
+                <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
+                  <div className="mb-3">
                     <h2 className="text-base md:text-lg font-semibold text-slate-900">
                       My Service Requests
                     </h2>
@@ -447,49 +442,135 @@ const contractLabel = (req) => {
                       These service requests were created by you.
                     </p>
                   </div>
-                </div>
 
-                {myRequests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    You have not created any requests yet. Use the{" "}
-                    <span className="font-medium">“Create Service Request”</span>{" "}
-                    button above to start.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-100">
-                    <table className="min-w-[850px] w-full text-sm">
-                      <thead className="bg-slate-50/80">
-                        <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
-                          <th className="py-2.5 px-3">Title</th>
-                          <th className="py-2.5 px-3">Type</th>
-                          <th className="py-2.5 px-3">Status</th>
-                          <th className="py-2.5 px-3">Project</th>
-                          <th className="py-2.5 px-3">Contract</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {myRequests.map((r) => {
-                          const offers = offersByRequestId[r.id] || [];
-                          return (
-                            <tr
-                              key={r.id}
-                              className="hover:bg-slate-50/60 transition-colors"
-                            >
+                  {myRequests.length === 0 ? (
+                    <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                      You have not created any requests yet.
+                    </p>
+                  ) : (
+                    <div className="rounded-xl border border-slate-100 overflow-hidden">
+                      {/* ✅ table-fixed + truncate prevents wide columns */}
+                      <table className="w-full text-sm table-fixed">
+                        <thead className="bg-slate-50/80">
+                          <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
+                            <th className="py-2.5 px-3 w-[38%]">Title</th>
+                            <th className="py-2.5 px-3 w-[12%]">Type</th>
+                            <th className="py-2.5 px-3 w-[16%]">Status</th>
+                            <th className="py-2.5 px-3 w-[18%]">Project</th>
+                            <th className="py-2.5 px-3 w-[16%]">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {myRequests.map((r) => {
+                            const offers = offersByRequestId[r.id] || [];
+                            return (
+                              <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="py-2.5 px-3 align-middle">
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-slate-900 truncate">
+                                      {r.title}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 truncate">
+                                      {offers.length} offer(s) • {r.roles?.length || 0} role(s)
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="py-2.5 px-3 align-middle text-xs text-slate-700 truncate">
+                                  {r.type}
+                                </td>
+
+                                <td className="py-2.5 px-3 align-middle">
+                                  <span
+                                    className={
+                                      "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
+                                      statusBadgeClass(r.status)
+                                    }
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                                    <span className="truncate">{r.status}</span>
+                                  </span>
+                                </td>
+
+                                <td className="py-2.5 px-3 align-middle text-xs text-slate-700 truncate">
+                                  {projectLabel(r)}
+                                </td>
+
+                                <td className="py-2.5 px-3 align-middle">
+                                  <div className="flex justify-end flex-wrap gap-1.5">
+                                    <button
+                                      onClick={() => navigate(`/requests/${r.id}`)}
+                                      className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800"
+                                      type="button"
+                                    >
+                                      View
+                                    </button>
+                                    {offers.length > 0 && (
+                                      <button
+                                        onClick={() => openOffersFullView(r)}
+                                        className="px-2.5 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                        type="button"
+                                      >
+                                        Offers
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* ALL REQUESTS TAB */}
+              {activeTab === "all_requests" && (
+                <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
+                  <div className="mb-3">
+                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
+                      All Service Requests
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Overview of service requests across all Project Managers.
+                    </p>
+                  </div>
+
+                  {requests.length === 0 ? (
+                    <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                      No service requests in the system yet.
+                    </p>
+                  ) : (
+                    <div className="rounded-xl border border-slate-100 overflow-hidden">
+                      {/* ✅ table-fixed, fewer columns -> less horizontal scroll */}
+                      <table className="w-full text-sm table-fixed">
+                        <thead className="bg-slate-50/80">
+                          <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
+                            <th className="py-2.5 px-3 w-[44%]">Title</th>
+                            <th className="py-2.5 px-3 w-[14%]">Type</th>
+                            <th className="py-2.5 px-3 w-[18%]">Status</th>
+                            <th className="py-2.5 px-3 w-[14%]">Requested By</th>
+                            <th className="py-2.5 px-3 w-[10%]">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {requests.map((r) => (
+                            <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
                               <td className="py-2.5 px-3 align-middle">
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-slate-900 text-sm">
-                                    {r.title}
-                                  </span>
-                                  <span className="text-[11px] text-slate-500">
-                                    {r.roles?.length || 0} role(s) •{" "}
-                                    {offers.length} offer(s)
-                                  </span>
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-900 truncate">{r.title}</div>
+                                  <div className="text-[11px] text-slate-500 truncate">
+                                    {projectLabel(r)} • {contractLabel(r)}
+                                  </div>
                                 </div>
                               </td>
-                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 truncate">
                                 {r.type}
                               </td>
+
                               <td className="py-2.5 px-3 align-middle">
                                 <span
                                   className={
@@ -498,460 +579,152 @@ const contractLabel = (req) => {
                                   }
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                  {r.status}
+                                  <span className="truncate">{r.status}</span>
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                                {projectLabel(r)}
+
+                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700 truncate">
+                                {r.requestedByUsername || "-"}
                               </td>
-                              <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                                {contractLabel(r)}
-                              </td>
+
                               <td className="py-2.5 px-3 align-middle">
-                                <div className="flex justify-end flex-wrap gap-1.5">
+                                <div className="flex justify-end">
                                   <button
                                     onClick={() => navigate(`/requests/${r.id}`)}
-                                    className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                                    className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800"
+                                    type="button"
                                   >
                                     View
                                   </button>
-                                  {offers.length > 0 && (
-                                    <button
-                                      onClick={() => openOffersModal(r)}
-                                      className="px-2.5 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                                    >
-                                      View Offers
-                                    </button>
-                                  )}
                                 </div>
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
 
-              {/* All Requests */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5 mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div>
+              {/* OFFERS TAB */}
+              {activeTab === "offers" && (
+                <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
+                  <div className="mb-3">
                     <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                      All Service Requests
+                      Offers for My Requests
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Overview of service requests across all Project Managers.
+                      Quick view of offers submitted for your service requests.
                     </p>
                   </div>
-                </div>
 
-                {requests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    No service requests in the system yet.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-100">
-                    <table className="min-w-[980px] w-full text-sm">
-                      <thead className="bg-slate-50/80">
-                        <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
-                          <th className="py-2.5 px-3">Title</th>
-                          <th className="py-2.5 px-3">Type</th>
-                          <th className="py-2.5 px-3">Status</th>
-                          <th className="py-2.5 px-3">Project</th>
-                          <th className="py-2.5 px-3">Contract</th>
-                          <th className="py-2.5 px-3">Requested By</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {requests.map((r) => (
-                          <tr
-                            key={r.id}
-                            className="hover:bg-slate-50/60 transition-colors"
+                  {myRequests.length === 0 ? (
+                    <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
+                      You have no requests, so there are no offers yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {myRequests.map((req) => {
+                        const offers = offersByRequestId[req.id] || [];
+                        return (
+                          <div
+                            key={req.id}
+                            className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
                           >
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-                            {req.status}
-                          </span>
-                        </div>
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 text-sm truncate">
+                                  {req.title}
+                                </p>
+                                <p className="text-[11px] text-slate-500 truncate">
+                                  {projectLabel(req)} • {contractLabel(req)}
+                                </p>
+                              </div>
 
-                        {/* Offers for my requests (compact overview, like before) */}
-                        <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                                Offers for My Requests
-                              </h2>
-                              <p className="text-xs text-slate-500">
-                                Quick view of offers that suppliers have submitted for
-                                your service requests.
-                              </p>
-                            </div>
-                          </div>
-                          {myRequests.length === 0 ? (
-                            <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                              You have no requests, so there are no offers yet.
-                            </p>
-                          ) : (
-                            <div className="space-y-3">
-                              {myRequests.map((req) => {
-                                const offers = offersByRequestId[req.id] || [];
-                                return (
-                                  <div
-                                    key={req.id}
-                                    className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={
+                                    "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
+                                    statusBadgeClass(req.status)
+                                  }
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                                  {req.status}
+                                </span>
+
+                                <span className="inline-flex items-center rounded-full bg-white text-slate-700 border border-slate-200 px-2.5 py-1 text-[11px] font-medium">
+                                  {offers.length} offer(s)
+                                </span>
+
+                                {offers.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openOffersFullView(req)}
+                                    className="px-2.5 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-700"
                                   >
-                                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
-                                      <div>
-                                        <p className="font-semibold text-slate-900 text-sm">
-                                          {req.title}
-                                        </p>
-                                        <p className="text-[11px] text-slate-500">
-                                          {projectLabel(req)} • {contractLabel(req)}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className={
-                                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
-                                            statusBadgeClass(req.status)
-                                          }
-                                          ></span>
+                                    Open Full Offers
+                                  </button>
+                                )}
+                              </div>
+                            </div>
 
-
-
-
-
-
-
-                        {/* Offers modal */}
-                        {offerModalOpen && offerModalRequest && (
-                          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40">
-                            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-lg border border-slate-100">
-                              <h3 className="text-lg font-semibold mb-2 text-slate-900">
-                                Offers for "{offerModalRequest.title}"
-                              </h3>
-                              <p className="text-xs text-slate-600 mb-3">
-                                Project: {projectLabel(offerModalRequest)} • Contract:{" "}
-                                {contractLabel(offerModalRequest)}
+                            {offers.length === 0 ? (
+                              <p className="text-xs text-slate-500">
+                                No offers received yet.
                               </p>
-                              {(() => {
-                              const offers =
-                                offersByRequestId[offerModalRequest.id] || [];
-                              if (offers.length === 0) {
-                                return (
-                                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-3 py-4 text-center">
-                                    No offers have been submitted yet for this request.
-                                  </p>
-                                );
-                              }
-                              return (
-                              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                {offers.map((o) => (
+                            ) : (
+                              <div className="space-y-2">
+                                {offers.slice(0, 3).map((o) => (
                                   <div
                                     key={o.id}
-                                    className="border border-slate-200 rounded-xl p-2.5 text-xs flex justify-between gap-3"
+                                    className="border-t border-slate-200 pt-2 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 text-xs"
                                   >
-                                    <div>
-                                      <p className="font-semibold text-slate-900">
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-slate-800 truncate">
                                         {o.specialistName || "Unnamed Specialist"}
                                       </p>
-                                      <p className="text-slate-600">
-                                        Supplier: {o.supplierName} (
-                                        {o.contractualRelationship})
+                                      <p className="text-slate-500 break-words">
+                                        Supplier: {o.supplierName} ({o.contractualRelationship})
                                       </p>
                                       {o.notes && (
-                                        <p className="text-slate-500 mt-0.5">
+                                        <p className="text-slate-500 mt-0.5 break-words">
                                           Notes: {o.notes}
                                         </p>
                                       )}
-                                                </div>
-                                    <div className="text-right">
-                                      <p className="text-slate-700">
-                                        Daily rate:{" "}
-                                        <span className="font-semibold">
-                                          {o.dailyRate} €
-                                        </span>
+                                    </div>
+                                    <div className="sm:text-right">
+                                      <p className="text-slate-600">
+                                        Daily rate: {o.dailyRate} €
                                       </p>
-                                      <p className="text-slate-900 font-semibold">
+                                      <p className="font-semibold text-slate-900">
                                         Total: {o.totalCost} €
                                       </p>
                                     </div>
                                   </div>
                                 ))}
+
+                                {offers.length > 3 && (
+                                  <p className="text-[11px] text-slate-500 pt-1">
+                                    Showing 3 of {offers.length}. Use{" "}
+                                    <span className="font-semibold">Open Full Offers</span> to view all.
+                                  </p>
+                                )}
                               </div>
-                            );
-                          })()}
-                          
-
-
-
-
-
-                        {offers.length === 0 ? (
-                          <p className="text-xs text-gray-500">
-                            No offers received yet.
-                          </p>
-                        ) : (
-                          <div className="space-y-1">
-                            {offers.map((o) => (
-                              <div
-                                key={o.id}
-                                className="flex justify-between text-xs border-t pt-1 mt-1"
-                              >
-                                <div>
-                                  <p className="font-semibold text-gray-700">
-                                    {o.specialistName || "Unnamed Specialist"}
-                                  </p>
-                                  <p className="text-gray-500">
-                                    Supplier: {o.supplierName} (
-                                    {o.contractualRelationship})
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-gray-600">
-                                    Daily rate: {o.dailyRate} €
-                                  </p>
-                                  <p className="font-semibold text-gray-800">
-                                    Total: {o.totalCost} €
-                                  </p>
-                                </div>
-=======
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-900 text-sm">
-                                  {r.title}
-                                </span>
-                                <span className="text-[11px] text-slate-500">
-                                  {r.roles?.length || 0} role(s)
-                                </span>
-<<<<<<< HEAD
-=======
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
->>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {r.type}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <span
-                                className={
-                                  "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
-                                  statusBadgeClass(r.status)
-                                }
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                {r.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {projectLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {contractLabel(r)}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
-                              {r.requestedByUsername || "-"}
-                            </td>
-                            <td className="py-2.5 px-3 align-middle">
-                              <div className="flex justify-end">
-                                <button
-                                  onClick={() => navigate(`/requests/${r.id}`)}
-                                  className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-                                >
-                                  View
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              {/* Offers for my requests */}
-              <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div>
-                    <h2 className="text-base md:text-lg font-semibold text-slate-900">
-                      Offers for My Requests
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Quick view of offers that suppliers have submitted for
-                      your service requests.
-                    </p>
-                  </div>
-                </div>
-
-                {myRequests.length === 0 ? (
-                  <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
-                    You have no requests, so there are no offers yet.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {myRequests.map((req) => {
-                      const offers = offersByRequestId[req.id] || [];
-                      return (
-                        <div
-                          key={req.id}
-                          className="border border-slate-100 rounded-2xl p-3.5 bg-slate-50/60"
-                        >
-                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-1">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-900 text-sm">
-                                {req.title}
-                              </p>
-                              <p className="text-[11px] text-slate-500 break-words">
-                                {projectLabel(req)} • {contractLabel(req)}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={
-                                  "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " +
-                                  statusBadgeClass(req.status)
-                                }
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                                {req.status}
-                              </span>
-                              <span className="inline-flex items-center rounded-full bg-white text-slate-700 border border-slate-200 px-2.5 py-1 text-[11px] font-medium">
-                                {offers.length} offer(s)
-                              </span>
-                            </div>
-                          </div>
-
-                          {offers.length === 0 ? (
-                            <p className="text-xs text-slate-500">
-                              No offers received yet.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {offers.map((o) => (
-                                <div
-                                  key={o.id}
-                                  className="border-t border-slate-200 pt-2 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 text-xs"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-slate-800">
-                                      {o.specialistName || "Unnamed Specialist"}
-                                    </p>
-                                    <p className="text-slate-500 break-words">
-                                      Supplier: {o.supplierName} (
-                                      {o.contractualRelationship})
-                                    </p>
-                                    {o.notes && (
-                                      <p className="text-slate-500 mt-0.5 break-words">
-                                        Notes: {o.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="sm:text-right">
-                                    <p className="text-slate-600">
-                                      Daily rate: {o.dailyRate} €
-                                    </p>
-                                    <p className="font-semibold text-slate-900">
-                                      Total: {o.totalCost} €
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-
-          {/* Offers modal */}
-          {offerModalOpen && offerModalRequest && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-40 px-3">
-              <div className="bg-white rounded-2xl shadow-xl p-4 md:p-5 w-full max-w-lg border border-slate-100">
-                <h3 className="text-lg font-semibold mb-2 text-slate-900 break-words">
-                  Offers for "{offerModalRequest.title}"
-                </h3>
-                <p className="text-xs text-slate-600 mb-3 break-words">
-                  Project: {projectLabel(offerModalRequest)} • Contract:{" "}
-                  {contractLabel(offerModalRequest)}
-                </p>
-
-                {(() => {
-                  const offers = offersByRequestId[offerModalRequest.id] || [];
-                  if (offers.length === 0) {
-                    return (
-                      <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-3 py-4 text-center">
-                        No offers have been submitted yet for this request.
-                      </p>
-                    );
-                  }
-                  return (
-                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                      {offers.map((o) => (
-                        <div
-                          key={o.id}
-                          className="border border-slate-200 rounded-xl p-2.5 text-xs flex flex-col sm:flex-row sm:justify-between gap-3"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-semibold text-slate-900">
-                              {o.specialistName || "Unnamed Specialist"}
-                            </p>
-                            <p className="text-slate-600 break-words">
-                              Supplier: {o.supplierName} (
-                              {o.contractualRelationship})
-                            </p>
-                            {o.notes && (
-                              <p className="text-slate-500 mt-0.5 break-words">
-                                Notes: {o.notes}
-                              </p>
                             )}
                           </div>
-                          <div className="sm:text-right">
-                            <p className="text-slate-700">
-                              Daily rate:{" "}
-                              <span className="font-semibold">
-                                {o.dailyRate} €
-                              </span>
-                            </p>
-                            <p className="text-slate-900 font-semibold">
-                              Total: {o.totalCost} €
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  );
-                })()}
-
-                <div className="flex justify-end gap-2 mt-4">
-                  <button
-                    onClick={closeOffersModal}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
+                  )}
+                </section>
+              )}
+            </>
           )}
         </div>
       </div>
     </div>
   );
 };
-      
 
 export default ProjectManagerDashboard;
-
-
-//changes related to ProjectManagerDashboard file 
