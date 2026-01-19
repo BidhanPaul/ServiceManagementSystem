@@ -1,3 +1,4 @@
+// src/components/charts/UserRolePieChart.js
 import React, { useEffect, useState } from "react";
 import API from "../../api/api";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
@@ -15,17 +16,15 @@ export default function UserRolePieChart() {
     try {
       const res = await API.get("/users");
 
-      // Calculate role counts
       const roles = {};
-      res.data.forEach(u => {
+      res.data.forEach((u) => {
         roles[u.role] = (roles[u.role] || 0) + 1;
       });
 
-      // Convert to chart format
       setData(
         Object.entries(roles).map(([role, count]) => ({
           name: role,
-          value: count
+          value: count,
         }))
       );
     } catch (error) {
@@ -34,29 +33,27 @@ export default function UserRolePieChart() {
   };
 
   return (
-    <div className="bg-white/40 backdrop-blur-xl border border-white/30 shadow-md rounded-xl p-6 w-full">
-      <h2 className="text-xl font-semibold text-blue-700 mb-4">
-        📊 Employees by Role
-      </h2>
-
-      <div className="flex justify-center">
-        <PieChart width={350} height={300}>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            outerRadius={120}
-            dataKey="value"
-            label
-          >
-            {data.map((entry, index) => (
-              <Cell key={index} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip />
-          <Legend />
-        </PieChart>
-      </div>
+    <div className="w-full h-full flex items-center justify-center">
+      <PieChart width={260} height={260}>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          outerRadius={90}
+          dataKey="value"
+          label
+        >
+          {data.map((entry, index) => (
+            <Cell key={index} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend
+  verticalAlign="bottom"
+  height={36}
+  wrapperStyle={{ fontSize: "10px" }} 
+/>
+      </PieChart>
     </div>
   );
 }

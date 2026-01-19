@@ -1,33 +1,56 @@
-// src/pages/NotFound.js
 import { useNavigate } from "react-router-dom";
-import { FiHome, FiAlertCircle } from "react-icons/fi";
+import { FiHome, FiAlertTriangle } from "react-icons/fi";
 
 export default function NotFound() {
   const navigate = useNavigate();
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center text-center text-blue-900"
+      className="min-h-screen flex items-center justify-center p-6"
       style={{
-        background: "linear-gradient(180deg, #A7C4FF, #D1E8FF)",
+        background: "linear-gradient(to bottom, #93B5FF, #BFD9FF)",
       }}
     >
-      <div className="bg-white/50 backdrop-blur-md rounded-3xl p-10 shadow-xl border border-white/40 max-w-lg">
+      {/* Card */}
+      <div className="bg-white/90 shadow-2xl rounded-3xl border border-white/50 p-10 max-w-xl w-full text-center">
         
-        <FiAlertCircle className="text-blue-700 text-7xl mb-6 drop-shadow-md" />
+        {/* Icon */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-blue-100 p-5 rounded-full shadow-md">
+            <FiAlertTriangle className="text-blue-700 text-6xl" />
+          </div>
+        </div>
 
-        <h1 className="text-6xl font-extrabold mb-4">404</h1>
+        {/* Title */}
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-2 tracking-tight">
+          404
+        </h1>
 
-        <p className="text-xl font-medium text-gray-700 mb-6">
-          Oops! The page you're looking for doesn't exist.
+        {/* Subtitle */}
+        <p className="text-lg text-gray-700 mb-6">
+          The page you're trying to access doesn’t exist or has been moved.
         </p>
 
+        {/* Home Button */}
         <button
           onClick={() => navigate("/")}
-          className="px-6 py-3 flex items-center justify-center gap-3 bg-blue-600 text-white rounded-xl text-lg hover:bg-blue-700 transition"
+          className="
+            flex items-center justify-center gap-3
+            mx-auto px-6 py-3 
+            rounded-xl text-white font-semibold text-lg
+            bg-blue-600 hover:bg-blue-700
+            shadow-md hover:shadow-lg transition-all
+            w-56
+          "
         >
-          <FiHome className="text-xl" /> Go Back Home
+          <FiHome className="text-2xl" />
+          Go Home
         </button>
+
+        {/* Extra little text */}
+        <p className="text-sm text-gray-500 mt-6">
+          Need help? Contact your administrator if the issue persists.
+        </p>
       </div>
     </div>
   );

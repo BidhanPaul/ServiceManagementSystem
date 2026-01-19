@@ -8,7 +8,15 @@ export default function TopNav() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 backdrop-blur-md text-white mb-6">
+    <div
+      className="
+        w-full flex items-center justify-between
+        px-6 py-4 mb-6
+        bg-white/50 backdrop-blur-xl
+        shadow-[0_4px_10px_rgba(0,0,0,0.05)]
+        border border-white/40 rounded-2xl
+      "
+    >
       {/* User Info */}
       <div className="flex items-center gap-3">
         <div className="bg-blue-100 p-3 rounded-full shadow-sm">
@@ -25,6 +33,7 @@ export default function TopNav() {
 
       {/* Navigation Actions */}
       <div className="flex items-center gap-4">
+
         <button
           onClick={() => navigate("/")}
           className="
@@ -58,6 +67,7 @@ export default function TopNav() {
           <FiLogOut className="text-lg" />
           Logout
         </button>
+
       </div>
     </div>
   );

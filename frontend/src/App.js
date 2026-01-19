@@ -11,6 +11,9 @@ import ServiceOfferForm from "./pages/ServiceOfferForm";
 import Notifications from "./pages/Notifications";
 import ServiceRequests from "./pages/ServiceRequests";
 import RequestDetails from "./pages/RequestDetails";
+import Settings from "./pages/Settings";
+
+
 
 function App() {
   return (
@@ -25,6 +28,7 @@ function App() {
         <Route path="/service-offers" element={<PrivateRoute><ServiceOfferList /></PrivateRoute>} />
         <Route path="/create-service-offer" element={<PrivateRoute role="ADMIN"><ServiceOfferForm /></PrivateRoute>} />
         <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+         <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

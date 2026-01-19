@@ -45,6 +45,7 @@ export default function UserEditModal({ user, onClose, refresh }) {
           <option value="PROJECT_MANAGER">PROJECT_MANAGER</option>
           <option value="PROCUREMENT_OFFICER">PROCUREMENT_OFFICER</option>
           <option value="SERVICE_PROVIDER">SERVICE_PROVIDER</option>
+          <option value="RESOURCE_PLANNER">RESOURCE_PLANNER</option>
         </select>
 
         <input type="password" name="password" value={form.password} onChange={handleChange}
