@@ -1,9 +1,9 @@
 // src/components/ProcurementDashboard.js
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
 import React, { useEffect, useState } from "react";
-=======
+=========
 import React, { useEffect, useMemo, useState } from "react";
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../layout/Sidebar";
 import TopNav from "./TopNav";
@@ -29,7 +29,7 @@ const ProcurementDashboard = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectTargetRequest, setRejectTargetRequest] = useState(null);
 
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
   const currentUsername = localStorage.getItem("username");
 
   // -------- LOAD DATA --------
@@ -55,7 +55,7 @@ const ProcurementDashboard = () => {
       setContracts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load contracts from mockapi", err);
-=======
+=========
   const currentUsername = localStorage.getItem("username") || "";
   const myRole = localStorage.getItem("role") || "PROCUREMENT_OFFICER";
 
@@ -78,7 +78,7 @@ const ProcurementDashboard = () => {
     } catch (err) {
       console.error("Failed to load contracts (external)", err);
       setContracts([]);
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
     }
   };
 
@@ -88,10 +88,10 @@ const ProcurementDashboard = () => {
       setRequests(res.data || []);
     } catch (err) {
       console.error("Failed to load requests", err);
-<<<<<<< HEAD
-=======
+<<<<<<<<< Temporary merge branch 1
+=========
       setRequests([]);
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
     }
   };
 
@@ -112,32 +112,32 @@ const ProcurementDashboard = () => {
       setOffersByRequestId(map);
     } catch (err) {
       console.error("Failed to load offers for requests", err);
-<<<<<<< HEAD
-=======
+<<<<<<<<< Temporary merge branch 1
+=========
       setOffersByRequestId({});
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
     }
   };
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
       await Promise.all([
         loadProjectsFromMock(),
         loadContractsFromMock(),
         loadRequests(),
       ]);
-=======
+=========
       await Promise.all([loadProjects(), loadContracts(), loadRequests()]);
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
       setLoading(false);
     };
     init();
   }, []);
 
   useEffect(() => {
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
     if (requests.length > 0) {
       loadOffersForRequests(requests);
     } else {
@@ -146,13 +146,13 @@ const ProcurementDashboard = () => {
   }, [requests]);
 
   // -------- HELPERS --------
-=======
+=========
     if (requests.length > 0) loadOffersForRequests(requests);
     else setOffersByRequestId({});
   }, [requests]);
 
   // ---------------- HELPERS ----------------
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
 
   const statusBadgeClass = (status) => {
     switch (status) {
@@ -174,7 +174,7 @@ const ProcurementDashboard = () => {
   };
 
   const projectLabel = (req) => {
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
     if (!req.projectIds || req.projectIds.length === 0) return "-";
     const id = req.projectIds[0];
     const proj = projects.find((p) => p.id === id);
@@ -198,7 +198,7 @@ const ProcurementDashboard = () => {
   );
 
   // -------- ACTIONS --------
-=======
+=========
     const id = req?.projectId;
     if (!id) return "-";
 
@@ -244,7 +244,7 @@ const ProcurementDashboard = () => {
   );
 
   // ---------------- ACTIONS ----------------
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
 
   const openContactPm = (req) => {
     if (!req.requestedByUsername) {
@@ -256,7 +256,7 @@ const ProcurementDashboard = () => {
     setContactOpen(true);
   };
 
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
   const submitContactPm = async () => {
     if (!contactTargetRequest || !contactTargetRequest.requestedByUsername) {
       toast.error("No valid PM to contact.");
@@ -282,7 +282,7 @@ const ProcurementDashboard = () => {
       toast.error("Failed to send message to PM.");
     }
   };
-=======
+=========
   // ✅ uses existing notification endpoint (NO /messages/send)
 const submitContactPm = async () => {
   if (!contactTargetRequest?.requestedByUsername) {
@@ -317,7 +317,7 @@ const submitContactPm = async () => {
 
 
 
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
 
   const openReject = (req) => {
     setRejectTargetRequest(req);
@@ -333,7 +333,7 @@ const submitContactPm = async () => {
     }
 
     try {
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
       await API.put(
         `/requests/${rejectTargetRequest.id}/reject`,
         rejectReason,
@@ -343,11 +343,11 @@ const submitContactPm = async () => {
           },
         }
       );
-=======
+=========
       await API.put(`/requests/${rejectTargetRequest.id}/reject`, rejectReason, {
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
       });
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
       toast.success("Request rejected.");
       setRejectOpen(false);
       setRejectTargetRequest(null);
@@ -370,39 +370,39 @@ const submitContactPm = async () => {
     }
   };
 
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
   // -------- RENDER --------
 
   return (
     <div className="flex">
-=======
+=========
   // ---------------- RENDER ----------------
 
   return (
     <div className="flex min-h-screen">
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
       <Sidebar />
 
       <div className="flex-1 min-h-screen bg-gradient-to-b from-blue-100 via-sky-100 to-blue-300">
         <div className="max-w-6xl mx-auto px-4 py-6 md:px-6 md:py-8">
           <TopNav />
 
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
           {/* Page header */}
-=======
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+=========
+>>>>>>>>> Temporary merge branch 2
           <header className="mt-4 mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
                 Procurement Officer Panel
               </h1>
               <p className="text-sm text-slate-600 mt-1">
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                 Review, approve and oversee service requests and supplier
                 offers.
-=======
+=========
                 Review, approve and oversee service requests and supplier offers.
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
               </p>
             </div>
             <div className="mt-2 md:mt-0 text-xs text-slate-500">
@@ -415,7 +415,7 @@ const submitContactPm = async () => {
 
           {/* Overview cards */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-6">
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
             {/* Pending approvals */}
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-blue-50 text-blue-700">
@@ -431,17 +431,17 @@ const submitContactPm = async () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-=======
+=========
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-blue-50 text-blue-700">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path d="M12 6v6l3 3" strokeLinecap="round" strokeLinejoin="round" />
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                   <circle cx="12" cy="12" r="9" />
                 </svg>
               </div>
               <div>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Pending approvals
                 </p>
@@ -495,7 +495,7 @@ const submitContactPm = async () => {
                   strokeWidth="2"
                   viewBox="0 0 24 24"
                 >
-=======
+=========
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending approvals</p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">{pendingRequests.length}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Awaiting your decision</p>
@@ -519,12 +519,12 @@ const submitContactPm = async () => {
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-700">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                   <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
                 </svg>
               </div>
               <div>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Projects (Mock API)
                 </p>
@@ -564,7 +564,7 @@ const submitContactPm = async () => {
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Offers received across all requests
                 </p>
-=======
+=========
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Projects (External)</p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">{projects.length}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Available project references</p>
@@ -581,7 +581,7 @@ const submitContactPm = async () => {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Supplier offers</p>
                 <p className="text-3xl font-bold text-slate-900 mt-1">{totalOffers}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Offers received across requests</p>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
               </div>
             </div>
           </section>
@@ -600,12 +600,12 @@ const submitContactPm = async () => {
                       Requests Waiting for Approval
                     </h2>
                     <p className="text-xs text-slate-500">
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                       These requests have been submitted by Project Managers and
                       require Procurement approval.
-=======
+=========
                       Submitted by Project Managers, waiting for your approval.
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                     </p>
                   </div>
                   {pendingRequests.length > 0 && (
@@ -621,11 +621,11 @@ const submitContactPm = async () => {
                   </p>
                 ) : (
                   <div className="overflow-x-auto rounded-xl border border-slate-100">
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                     <table className="w-full text-sm">
-=======
+=========
                     <table className="w-full text-sm min-w-[900px]">
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                       <thead className="bg-slate-50/80">
                         <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
                           <th className="py-2.5 px-3">Title</th>
@@ -638,7 +638,7 @@ const submitContactPm = async () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {pendingRequests.map((r) => (
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                           <tr
                             key={r.id}
                             className="hover:bg-slate-50/60 transition-colors"
@@ -648,18 +648,18 @@ const submitContactPm = async () => {
                                 <span className="font-medium text-slate-900 text-sm">
                                   {r.title}
                                 </span>
-=======
+=========
                           <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-2.5 px-3 align-middle">
                               <div className="flex flex-col">
                                 <span className="font-medium text-slate-900 text-sm">{r.title}</span>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                                 <span className="text-[11px] text-slate-500">
                                   {r.type} • {r.roles?.length || 0} role(s)
                                 </span>
                               </div>
                             </td>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
                               {projectLabel(r)}
                             </td>
@@ -676,13 +676,13 @@ const submitContactPm = async () => {
                                   statusBadgeClass(r.status)
                                 }
                               >
-=======
+=========
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{projectLabel(r)}</td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{contractLabel(r)}</td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.requestedByUsername || "-"}</td>
                             <td className="py-2.5 px-3 align-middle">
                               <span className={"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " + statusBadgeClass(r.status)}>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                                 {r.status}
                               </span>
@@ -730,29 +730,29 @@ const submitContactPm = async () => {
                     <h2 className="text-base md:text-lg font-semibold text-slate-900">
                       All Service Requests
                     </h2>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                     <p className="text-xs text-slate-500">
                       Overview of all requests across projects and contracts.
                     </p>
                   </div>
                 </div>
-=======
+=========
                     <p className="text-xs text-slate-500">Overview across all projects and contracts.</p>
                   </div>
                 </div>
 
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                 {requests.length === 0 ? (
                   <p className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl px-4 py-6 text-center">
                     No service requests in the system.
                   </p>
                 ) : (
                   <div className="overflow-x-auto rounded-xl border border-slate-100">
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                     <table className="w-full text-sm">
-=======
+=========
                     <table className="w-full text-sm min-w-[1000px]">
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                       <thead className="bg-slate-50/80">
                         <tr className="text-left text-slate-500 text-xs uppercase tracking-wide">
                           <th className="py-2.5 px-3">Title</th>
@@ -766,7 +766,7 @@ const submitContactPm = async () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {requests.map((r) => (
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                           <tr
                             key={r.id}
                             className="hover:bg-slate-50/60 transition-colors"
@@ -791,7 +791,7 @@ const submitContactPm = async () => {
                                   statusBadgeClass(r.status)
                                 }
                               >
-=======
+=========
                           <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-2.5 px-3 align-middle">
                               <div className="flex flex-col">
@@ -802,12 +802,12 @@ const submitContactPm = async () => {
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.type}</td>
                             <td className="py-2.5 px-3 align-middle">
                               <span className={"inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium " + statusBadgeClass(r.status)}>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                                 {r.status}
                               </span>
                             </td>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
                               {projectLabel(r)}
                             </td>
@@ -817,11 +817,11 @@ const submitContactPm = async () => {
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">
                               {r.requestedByUsername || "-"}
                             </td>
-=======
+=========
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{projectLabel(r)}</td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{contractLabel(r)}</td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">{r.requestedByUsername || "-"}</td>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                             <td className="py-2.5 px-3 align-middle">
                               <div className="flex justify-end">
                                 <button
@@ -839,7 +839,7 @@ const submitContactPm = async () => {
                   </div>
                 )}
               </section>
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
 
               {/* Offers per request */}
               <section className="bg-white/95 rounded-2xl shadow-sm border border-slate-100 p-4 md:p-5">
@@ -902,8 +902,8 @@ const submitContactPm = async () => {
                   </div>
                 )}
               </section>
-=======
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+=========
+>>>>>>>>> Temporary merge branch 2
             </>
           )}
 
@@ -916,13 +916,13 @@ const submitContactPm = async () => {
                 </h3>
                 <p className="text-xs text-slate-600 mb-2">
                   Request:{" "}
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                   <span className="font-semibold">
                     {contactTargetRequest?.title}
                   </span>
-=======
+=========
                   <span className="font-semibold">{contactTargetRequest?.title}</span>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                 </p>
                 <textarea
                   value={contactMessage}
@@ -958,24 +958,24 @@ const submitContactPm = async () => {
                 </h3>
                 <p className="text-xs text-slate-600 mb-2">
                   Request:{" "}
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                   <span className="font-semibold">
                     {rejectTargetRequest?.title}
                   </span>
-=======
+=========
                   <span className="font-semibold">{rejectTargetRequest?.title}</span>
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                 </p>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={4}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-red-400"
-<<<<<<< HEAD
+<<<<<<<<< Temporary merge branch 1
                   placeholder="Provide a clear reason for the rejection (this will be visible to the Project Manager)."
-=======
+=========
                   placeholder="Provide a clear reason for the rejection (visible to the Project Manager)."
->>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>>>> Temporary merge branch 2
                 />
                 <div className="flex justify-end gap-2">
                   <button

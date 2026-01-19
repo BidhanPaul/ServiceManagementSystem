@@ -572,6 +572,8 @@ const contractLabel = (req) => {
                             className="hover:bg-slate-50/60 transition-colors"
                           >
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
                             {req.status}
                           </span>
                         </div>
@@ -718,6 +720,7 @@ const contractLabel = (req) => {
                                   </p>
                                 </div>
 =======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
                             <td className="py-2.5 px-3 align-middle">
                               <div className="flex flex-col">
                                 <span className="font-medium text-slate-900 text-sm">
@@ -726,7 +729,10 @@ const contractLabel = (req) => {
                                 <span className="text-[11px] text-slate-500">
                                   {r.roles?.length || 0} role(s)
                                 </span>
+<<<<<<< HEAD
+=======
 >>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
                               </div>
                             </td>
                             <td className="py-2.5 px-3 align-middle text-xs text-slate-700">

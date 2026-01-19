@@ -9,6 +9,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const role = getUserRole();
 <<<<<<< HEAD
+  const username = localStorage.getItem("username");
+
+  const [unreadCount, setUnreadCount] = useState(0);
+=======
+<<<<<<< HEAD
 
   useEffect(() => {
     fetchNotifications();
@@ -28,6 +33,7 @@ export default function Sidebar() {
 
   const [unreadCount, setUnreadCount] = useState(0);
 >>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
 
   const handleLogout = () => {
     removeToken();
@@ -104,6 +110,8 @@ export default function Sidebar() {
       </span>
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
       <div className="flex flex-col gap-4 text-sm font-medium">
         {/* Dashboard */}
         <button
@@ -156,6 +164,7 @@ export default function Sidebar() {
       </div>
     </div>
 =======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
       {showBadge && unreadCount > 0 && (
         <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md">
           {unreadCount}
@@ -216,6 +225,9 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+<<<<<<< HEAD
+=======
 >>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
   );
 }

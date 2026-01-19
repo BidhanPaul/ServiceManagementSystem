@@ -176,6 +176,8 @@ export default function Dashboard() {
           {/* ---------- STAT CARDS ---------- */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
 
             {/* Total Users */}
             <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
@@ -256,6 +258,7 @@ export default function Dashboard() {
 
 </section>
 =======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
             {/* Total Users */}
             <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="inline-flex items-center justify-center rounded-2xl bg-blue-50 w-12 h-12">
@@ -331,7 +334,10 @@ export default function Dashboard() {
               </div>
             </div>
           </section>
+<<<<<<< HEAD
+=======
 >>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
 
           {/* ✅ NEW: ADMIN REQUEST DELETE SECTION (keeps everything else unchanged) */}
           {isAdmin && (

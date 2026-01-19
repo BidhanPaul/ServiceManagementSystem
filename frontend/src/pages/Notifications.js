@@ -1,5 +1,7 @@
 // src/pages/Notifications.js
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
 
 import { useEffect, useState, useCallback } from "react";
 import API from "../api/api";
@@ -34,6 +36,7 @@ export default function Notifications() {
         } catch (err) {
             console.error("Failed to load notifications", e
 =======
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
 import { useEffect, useMemo, useState } from "react";
 import API from "../api/api";
 import TopNav from "../components/TopNav";
@@ -695,4 +698,7 @@ export default function Notifications() {
     </div>
   );
 }
+<<<<<<< HEAD
+=======
 >>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
+>>>>>>> 58712b27659c3c1fb105b2ba2f701b21017e7f6d
