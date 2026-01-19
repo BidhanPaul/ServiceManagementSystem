@@ -1,31 +1,33 @@
 // src/components/ServiceProviderDashboard.js
-import React from "react";
+import React, { memo } from "react";
+
+const StatCard = memo(function StatCard({ title, value }) {
+    return (
+        <div
+            className="bg-white shadow-md rounded-xl p-6"
+            role="group"
+            aria-label={title}
+        >
+            <h2 className="font-semibold text-gray-800">{title}</h2>
+            <p className="text-3xl font-bold text-green-600 mt-2">{value}</p>
+        </div>
+    );
+});
 
 const ServiceProviderDashboard = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold text-green-700 mb-6">
-        Service Provider Panel
-      </h1>
+    const stats = [
+        { title: "Open Offers", value: 12 },
+        { title: "Accepted Orders", value: 5 },
+        { title: "Upcoming Tasks", value: 7 },
+    ];
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white shadow-md rounded-xl p-6">
-          <h2 className="font-semibold text-gray-800">Open Offers</h2>
-          <p className="text-3xl font-bold text-green-600 mt-2">12</p>
-        </div>
-
-        <div className="bg-white shadow-md rounded-xl p-6">
-          <h2 className="font-semibold text-gray-800">Accepted Orders</h2>
-          <p className="text-3xl font-bold text-green-600 mt-2">5</p>
-        </div>
-
-        <div className="bg-white shadow-md rounded-xl p-6">
-          <h2 className="font-semibold text-gray-800">Upcoming Tasks</h2>
-          <p className="text-3xl font-bold text-green-600 mt-2">7</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ServiceProviderDashboard;
+    return (
+        <section aria-label="Service Provider Dashboard">
+            <header className="mb-6">
+                <h1 className="text-3xl font-bold text-green-700">
+                    Service Provider Panel
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                    Quick overview of your current offers, orders, and upcoming work.
+                </p>
+            </head

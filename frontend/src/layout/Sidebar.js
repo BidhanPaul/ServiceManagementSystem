@@ -1,18 +1,35 @@
 // src/layout/Sidebar.js
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiHome, FiUsers, FiBell, FiSettings, FiLogOut } from "react-icons/fi";
 import { removeToken, getUserRole } from "../utils/auth";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import API from "../api/api";
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const role = getUserRole();
+<<<<<<< HEAD
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await API.get("/notifications/admin");
+      const unread = response.data?.filter((n) => !n.read)?.length || 0;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error("Failed to load notifications", error);
+    }
+  };
+=======
   const username = localStorage.getItem("username");
 
   const [unreadCount, setUnreadCount] = useState(0);
+>>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
 
-  const logoutHandler = () => {
+  const handleLogout = () => {
     removeToken();
     navigate("/login");
   };
@@ -86,6 +103,59 @@ export default function Sidebar() {
         {label}
       </span>
 
+<<<<<<< HEAD
+      <div className="flex flex-col gap-4 text-sm font-medium">
+        {/* Dashboard */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-3 hover:text-gray-200"
+        >
+          <FiHome /> Dashboard
+        </button>
+
+        {/* Manage Users — ONLY ADMIN */}
+        {role === "ADMIN" && (
+          <button
+            onClick={() => navigate("/admin/users")}
+            className="flex items-center gap-3 hover:text-gray-200"
+          >
+            <FiUsers /> Manage Users
+          </button>
+        )}
+
+        {/* Notifications */}
+        <button
+          onClick={() => navigate("/notifications")}
+          className="flex items-center gap-3 hover:text-gray-200 relative"
+        >
+          <FiBell /> Notifications
+          {unreadCount > 0 && (
+            <span className="ml-auto bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Settings */}
+        <button
+          onClick={() => navigate("/settings")}
+          className="flex items-center gap-3 hover:text-gray-200"
+        >
+          <FiSettings /> Settings
+        </button>
+      </div>
+
+      {/* Logout Button */}
+      <div className="mt-auto">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 text-red-100 hover:text-red-300"
+        >
+          <FiLogOut /> Logout
+        </button>
+      </div>
+    </div>
+=======
       {showBadge && unreadCount > 0 && (
         <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md">
           {unreadCount}
@@ -146,5 +216,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+>>>>>>> a754dd336a0bcf16b24b12d440f01f9c75f242e3
   );
 }
