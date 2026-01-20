@@ -38,10 +38,10 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ IMPORTANT: allow preflight (fixes many Render CORS issues)
+                        // ✅ IMPORTANT: allow CORS preflight everywhere
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Public endpoints (docs + auth)
+                        // ✅ Public endpoints (auth + docs)
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
@@ -57,79 +57,64 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC READ-ONLY (anyone / other teams / reporting)
+                        // ✅ PUBLIC READ-ONLY (reporting / bidders / other teams)
                         // ==========================================================
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
-
-                        // offers list + evaluation read are needed for reporting
                         .requestMatchers(HttpMethod.GET, "/api/requests/*/offers/**").permitAll()
-
-                        // orders read for reporting
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
 
                         // ==========================================================
-                        // ✅ BIDDING GROUP PUBLIC WRITE (what they need to integrate)
+                        // ✅ BIDDING GROUP PUBLIC WRITE
                         // ==========================================================
-                        // submit offers
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
-
-                        // allow bidders to request substitution/extension (change request creation)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/substitution").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/extension").permitAll()
 
                         // ==========================================================
-                        // ❌ KEEP RESTRICTED (internal-only decisions)
+                        // ❌ RESTRICTED (internal-only)
                         // ==========================================================
-
-                        // pull provider offers (internal RP/PO/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
 
-                        // compute evaluation (internal RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers/evaluation/compute")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
-                        // procurement approve/reject request
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/approve")
                         .hasAnyRole("PROCUREMENT_OFFICER", "ADMIN")
 
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/reject")
                         .hasAnyRole("PROCUREMENT_OFFICER", "ADMIN")
 
-                        // PM write operations (create/reactivate etc.)
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/requests/**")
+                        .hasRole("PROJECT_MANAGER")
 
-                        // PM selects preferred offer
+                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate")
+                        .hasRole("PROJECT_MANAGER")
+
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/offers/*/select")
                         .hasRole("PROJECT_MANAGER")
 
-                        // Create order (final approve) - ONLY RP/Admin
                         .requestMatchers(HttpMethod.POST, "/api/requests/offers/*/order")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/resource-planner/**")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
-                        // Orders approve/reject (RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/approve")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/reject")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
-                        // feedback (PM/Admin only)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/feedback")
                         .hasAnyRole("PROJECT_MANAGER", "ADMIN")
 
-                        // approve/reject change requests (RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/change/approve")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/change/reject")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
-                        // notifications should remain protected
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/direct-message").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/dm").authenticated()
@@ -137,7 +122,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
 
-                        // external refs require login
                         .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
 
                         // ✅ Everything else requires login
@@ -154,25 +138,23 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // If you are NOT using cookies, you can set this to false.
-        // But keeping it true is fine as long as origins are not "*".
+        // If you use JWT in Authorization header, credentials/cookies aren't required.
+        // But keeping credentials true is fine if you also avoid "*" origins.
         config.setAllowCredentials(true);
 
-        // ✅ Best for Render: allow localhost + ANY Render subdomain (so URL changes won't break you)
-        // This is the #1 reason people still see CORS after "adding the URL".
+        // ✅ More robust than setAllowedOrigins for Render domains
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
-                "http://localhost:5173",
                 "https://*.onrender.com"
         ));
 
-        // ✅ Allow anything your browser might send
+        // ✅ Allow all headers (simplifies CORS issues)
         config.setAllowedHeaders(List.of("*"));
 
-        // ✅ Allow methods you use
+        // ✅ Allow all common methods including OPTIONS
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-        // ✅ Expose headers if you ever want to read them in JS
+        // Optional
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
