@@ -34,7 +34,7 @@ function App() {
         <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
         <Route path="/orders" element={<PrivateRoute><OrdersList /></PrivateRoute>} />
         <Route path="/orders/:id" element={<PrivateRoute><OrderDetails /></PrivateRoute>} />
-
+        <Route path="/unauthorized" element={<NotFound />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

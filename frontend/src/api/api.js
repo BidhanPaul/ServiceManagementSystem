@@ -1,38 +1,29 @@
 // src/api/api.js
 import axios from "axios";
 
+/**
+ * Use env var in production and localhost in dev.
+ *
+ * CRA:   REACT_APP_API_BASE_URL
+ * Vite:  VITE_API_BASE_URL
+ *
+ * Example Render value:
+ *   https://servicemanagementsystem-1-2s7d.onrender.com
+ */
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
+  process.env.VITE_API_BASE_URL ||
+  "http://localhost:8080";
+
 // Create an Axios instance
 const API = axios.create({
-  baseURL: "http://localhost:8080/api", // Base URL for your backend
+  baseURL: `${API_BASE_URL}/api`,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Optional: Add request interceptor to attach token if you implement authentication later
-API.interceptors.request.use(
-  (config) => {
-    // Example: attach JWT token from localStorage
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Optional: Add response interceptor for global error handling
-API.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // You can handle global errors here
-    console.error("API ERROR:", error.response || error);
-    return Promise.reject(error);
-  }
-);
-
-
+// Request interceptor: attach JWT token (kept) + debug (kept)
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -41,12 +32,26 @@ API.interceptors.request.use(
     }
 
     // DEBUG (remove later)
-    console.log("[API]", config.method?.toUpperCase(), config.url, "AUTH?", !!config.headers.Authorization);
+    console.log(
+      "[API]",
+      config.method?.toUpperCase(),
+      config.baseURL ? `${config.baseURL}${config.url}` : config.url,
+      "AUTH?",
+      !!config.headers.Authorization
+    );
 
     return config;
   },
   (error) => Promise.reject(error)
 );
 
+// Response interceptor: global error handling (kept)
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error("API ERROR:", error.response || error);
+    return Promise.reject(error);
+  }
+);
 
 export default API;
