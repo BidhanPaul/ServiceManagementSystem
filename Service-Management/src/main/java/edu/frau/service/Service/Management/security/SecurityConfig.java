@@ -38,6 +38,9 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
+                        // ✅✅✅ CRITICAL: allow CORS preflight FIRST
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         // ✅ Public endpoints (docs + auth)
                         .requestMatchers(
                                 "/api/auth/login",
@@ -141,7 +144,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
+                // H2 console support
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+
+                // JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -150,22 +156,30 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+
+        // ✅ render frontend is a different origin -> allow it
         config.setAllowCredentials(true);
 
-        // ✅ allow dev + deployed frontend
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://servicemanagementsystem-og8h.onrender.com"
         ));
 
+        // ✅ allow ALL typical headers browsers send + your auth header
         config.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
                 "Accept",
-                "Origin"
+                "Origin",
+                "X-Requested-With"
         ));
 
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        // ✅ allow methods including OPTIONS (preflight)
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
+        ));
+
+        // (optional but safe)
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
