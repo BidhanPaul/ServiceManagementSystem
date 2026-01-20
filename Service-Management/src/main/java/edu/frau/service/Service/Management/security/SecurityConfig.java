@@ -1,5 +1,6 @@
 package edu.frau.service.Service.Management.security;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -18,8 +19,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.beans.factory.annotation.Qualifier;
-
 
 import java.util.List;
 
@@ -28,17 +27,13 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final PublicApiKeyFilter publicApiKeyFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, PublicApiKeyFilter publicApiKeyFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.publicApiKeyFilter = publicApiKeyFilter;
     }
 
-    /**
-     * ✅ CRITICAL FIX:
-     * Add a global CorsFilter at highest precedence.
-     * This ensures OPTIONS (preflight) always gets CORS headers,
-     * even if something returns early.
-     */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsFilter corsFilter(@Qualifier("corsConfigurationSource") CorsConfigurationSource source) {
@@ -49,7 +44,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // Keep your existing CORS config, but ensure Security uses it too
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -64,7 +58,6 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/h2-console/**",
-                                "/api/public/**",
                                 "/api-index",
                                 "/actuator/health",
                                 "/swagger-ui/**",
@@ -75,24 +68,26 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC READ-ONLY (anyone / other teams / reporting)
+                        // ✅ PUBLIC READ (reporting / other teams)
                         // ==========================================================
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
-
-                        // offers list + evaluation read are needed for reporting
-                        .requestMatchers(HttpMethod.GET, "/api/requests/*/offers/**").permitAll()
-
-                        // orders read for reporting
-                        .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
 
                         // ==========================================================
-                        // ✅ BIDDING GROUP PUBLIC WRITE (only offers for now)
+                        // ✅ PUBLIC WRITE (ONLY 3 endpoints)
+                        // Filter enforces header: ServiceRequestbids3a
                         // ==========================================================
+                        .requestMatchers(HttpMethod.POST, "/api/public/bids").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/public/order-changes/extension").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/public/order-changes/substitution").permitAll()
+
+                        // ==========================================================
+                        // ✅ Keep your existing rules
+                        // ==========================================================
+
+                        // existing open offer submit (your current flow)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
 
-                        // ==========================================================
-                        // ❌ KEEP RESTRICTED (internal-only decisions)
-                        // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
 
@@ -144,10 +139,12 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // ✅ needed if you ever use H2 console
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-                // ✅ keep your JWT filter logic
+                // ✅ API KEY filter must run BEFORE JWT filter
+                .addFilterBefore(publicApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // ✅ JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -157,28 +154,18 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // IMPORTANT:
-        // If allowCredentials=true, you cannot use "*" in allowedOrigins.
         config.setAllowCredentials(true);
 
-        // ✅ Use allowedOriginPatterns (more robust for Render)
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
                 "https://servicemanagementsystem-og8h.onrender.com"
         ));
 
-        // ✅ allow all headers (covers Authorization + Content-Type)
         config.setAllowedHeaders(List.of("*"));
-
-        // ✅ allow typical methods + OPTIONS (preflight)
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-
-        // ✅ optional: expose headers if frontend wants to read them
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        // ✅ apply to everything
         source.registerCorsConfiguration("/**", config);
 
         return source;
