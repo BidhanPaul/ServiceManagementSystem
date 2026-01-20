@@ -34,6 +34,9 @@ public class SecurityConfig {
         this.publicApiKeyFilter = publicApiKeyFilter;
     }
 
+    /**
+     * ✅ Ensures OPTIONS preflight always gets CORS headers.
+     */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsFilter corsFilter(@Qualifier("corsConfigurationSource") CorsConfigurationSource source) {
@@ -68,26 +71,34 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC READ (reporting / other teams)
+                        // ✅ PUBLIC READ (MUST BE FREE)
                         // ==========================================================
+                        // Your existing public requests API
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
+
+                        // ✅ Explicitly free these two (so nothing can accidentally override)
+                        .requestMatchers(HttpMethod.GET, "/api/public/offers").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/public/evaluations").permitAll()
+
+                        // ✅ Free any other GET under /api/public (reporting endpoints)
                         .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
 
                         // ==========================================================
                         // ✅ PUBLIC WRITE (ONLY 3 endpoints)
-                        // Filter enforces header: ServiceRequestbids3a
+                        // API key filter enforces header: ServiceRequestbids3a
                         // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/public/bids").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/public/order-changes/extension").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/public/order-changes/substitution").permitAll()
 
                         // ==========================================================
-                        // ✅ Keep your existing rules
+                        // ✅ Your existing public offer submit (current flow)
                         // ==========================================================
-
-                        // existing open offer submit (your current flow)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
 
+                        // ==========================================================
+                        // ❌ KEEP RESTRICTED (internal-only decisions)
+                        // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
 
@@ -139,6 +150,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
+                // ✅ needed if you ever use H2 console
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
                 // ✅ API KEY filter must run BEFORE JWT filter
@@ -154,6 +166,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
+        // If allowCredentials=true, you cannot use "*" in allowedOrigins.
         config.setAllowCredentials(true);
 
         config.setAllowedOriginPatterns(List.of(
