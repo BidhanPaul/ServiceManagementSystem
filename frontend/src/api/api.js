@@ -7,13 +7,16 @@ import axios from "axios";
  * CRA:   REACT_APP_API_BASE_URL
  * Vite:  VITE_API_BASE_URL
  *
- * Example Render value:
+ * Example Render value (IMPORTANT: no trailing slash):
  *   https://servicemanagementsystem-1-2s7d.onrender.com
  */
-const API_BASE_URL =
+const API_BASE_URL_RAW =
   process.env.REACT_APP_API_BASE_URL ||
   process.env.VITE_API_BASE_URL ||
   "http://localhost:8080";
+
+// ✅ FIX: Remove trailing slashes so we never produce //api
+const API_BASE_URL = String(API_BASE_URL_RAW).replace(/\/+$/, "");
 
 // Create an Axios instance
 const API = axios.create({
