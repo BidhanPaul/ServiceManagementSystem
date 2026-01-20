@@ -32,17 +32,16 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // ✅ CORS first
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ CRITICAL: allow preflight requests
+                        // ✅ CRITICAL: allow CORS preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Public endpoints (auth + docs + health)
+                        // ✅ Public endpoints (docs + auth)
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
@@ -58,65 +57,75 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC READ-ONLY
+                        // ✅ PUBLIC READ-ONLY (anyone / other teams / reporting)
                         // ==========================================================
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
+
+                        // offers list + evaluation read are needed for reporting
                         .requestMatchers(HttpMethod.GET, "/api/requests/*/offers/**").permitAll()
+
+                        // orders read for reporting
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC WRITE (you said keep free for now)
+                        // ✅ BIDDING GROUP PUBLIC WRITE (only offers for now)
                         // ==========================================================
+                        // submit offers
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/orders/*/substitution").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/orders/*/extension").permitAll()
 
                         // ==========================================================
-                        // ❌ RESTRICTED INTERNAL
+                        // ❌ KEEP RESTRICTED (internal-only decisions)
                         // ==========================================================
+
+                        // pull provider offers (internal RP/PO/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
 
+                        // compute evaluation (internal RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers/evaluation/compute")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
+                        // procurement approve/reject request
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/approve")
                         .hasAnyRole("PROCUREMENT_OFFICER", "ADMIN")
 
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/reject")
                         .hasAnyRole("PROCUREMENT_OFFICER", "ADMIN")
 
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**")
-                        .hasRole("PROJECT_MANAGER")
+                        // PM write operations (create/reactivate etc.)
+                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
 
-                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate")
-                        .hasRole("PROJECT_MANAGER")
-
+                        // PM selects preferred offer
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/offers/*/select")
                         .hasRole("PROJECT_MANAGER")
 
+                        // Create order (final approve) - ONLY RP/Admin
                         .requestMatchers(HttpMethod.POST, "/api/requests/offers/*/order")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/resource-planner/**")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
+                        // Orders approve/reject (RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/approve")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/reject")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
+                        // feedback (PM/Admin only)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/feedback")
                         .hasAnyRole("PROJECT_MANAGER", "ADMIN")
 
+                        // approve/reject change requests (RP/Admin)
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/change/approve")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/change/reject")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
-                        // notifications protected
+                        // notifications should remain protected
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/direct-message").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/dm").authenticated()
@@ -131,10 +140,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // h2 console support
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-
-                // ✅ JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -144,26 +150,22 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // ✅ IMPORTANT: you are not using cookies, only JWT → set FALSE
-        config.setAllowCredentials(false);
+        // If you keep allowCredentials(true), you MUST NOT use "*" for allowedOrigins.
+        config.setAllowCredentials(true);
 
-        // ✅ Render frontend + local dev
-        // Using allowedOriginPatterns avoids issues if Render changes subdomain formatting
-        config.setAllowedOriginPatterns(List.of(
-                "https://servicemanagementsystem-og8h.onrender.com",
-                "http://localhost:3000"
+        // ✅ allow dev + deployed frontend
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "https://servicemanagementsystem-og8h.onrender.com"
         ));
 
+        // ✅ simplest + safest for CORS headaches
+        config.setAllowedHeaders(List.of("*"));
+
+        // ✅ include OPTIONS for preflight
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-        config.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "Origin",
-                "X-Requested-With"
-        ));
-
+        // Optional
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
