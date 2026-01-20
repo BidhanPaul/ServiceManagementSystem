@@ -32,16 +32,17 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                // ✅ CORS first
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ IMPORTANT: allow CORS preflight everywhere
+                        // ✅ CRITICAL: allow preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Public endpoints (auth + docs)
+                        // ✅ Public endpoints (auth + docs + health)
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
@@ -57,21 +58,21 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ==========================================================
-                        // ✅ PUBLIC READ-ONLY (reporting / bidders / other teams)
+                        // ✅ PUBLIC READ-ONLY
                         // ==========================================================
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/requests/*/offers/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").permitAll()
 
                         // ==========================================================
-                        // ✅ BIDDING GROUP PUBLIC WRITE
+                        // ✅ PUBLIC WRITE (you said keep free for now)
                         // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/substitution").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/extension").permitAll()
 
                         // ==========================================================
-                        // ❌ RESTRICTED (internal-only)
+                        // ❌ RESTRICTED INTERNAL
                         // ==========================================================
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
@@ -115,6 +116,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders/*/change/reject")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
+                        // notifications protected
                         .requestMatchers(HttpMethod.POST, "/api/notifications/role/ADMIN").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/direct-message").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/notifications/dm").authenticated()
@@ -122,13 +124,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
 
+                        // external refs require login
                         .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
 
                         // ✅ Everything else requires login
                         .anyRequest().authenticated()
                 )
 
+                // h2 console support
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+
+                // ✅ JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -138,23 +144,26 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // If you use JWT in Authorization header, credentials/cookies aren't required.
-        // But keeping credentials true is fine if you also avoid "*" origins.
-        config.setAllowCredentials(true);
+        // ✅ IMPORTANT: you are not using cookies, only JWT → set FALSE
+        config.setAllowCredentials(false);
 
-        // ✅ More robust than setAllowedOrigins for Render domains
+        // ✅ Render frontend + local dev
+        // Using allowedOriginPatterns avoids issues if Render changes subdomain formatting
         config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "https://*.onrender.com"
+                "https://servicemanagementsystem-og8h.onrender.com",
+                "http://localhost:3000"
         ));
 
-        // ✅ Allow all headers (simplifies CORS issues)
-        config.setAllowedHeaders(List.of("*"));
-
-        // ✅ Allow all common methods including OPTIONS
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-        // Optional
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With"
+        ));
+
         config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
