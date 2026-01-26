@@ -150,10 +150,47 @@ export default function OrderDetails() {
     return `${n.toFixed(2)} €`;
   };
 
+  // ✅ UI FIX: backend might still return APPROVED after RP submits.
+// We treat it as SUBMITTED_TO_PROVIDER until provider system confirms.
+const effectiveStatus = (o) => {
+  if (!o) return null;
+
+  // If backend returns APPROVED but it wasn't approved by provider webhook,
+  // show it as "Submitted to Provider" to match the workflow.
+  if (
+    o.status === "APPROVED" &&
+    String(o.approvedBy || "").toUpperCase() !== "PROVIDER_GROUP3"
+  ) {
+    return "SUBMITTED_TO_PROVIDER";
+  }
+
+  return o.status;
+};
+
+
+  // ✅ NEW: human-friendly labels for lifecycle
+  const statusLabel = (status) => {
+    switch (status) {
+      case "PENDING_RP_APPROVAL":
+        return "Pending RP Approval";
+      case "SUBMITTED_TO_PROVIDER":
+        return "Submitted to Provider";
+      case "APPROVED":
+        return "Provider Approved";
+      case "REJECTED":
+        return "Provider Rejected";
+      default:
+        return status || "-";
+    }
+  };
+
+  // ✅ UPDATED: badge colors (added SUBMITTED_TO_PROVIDER)
   const badgeClass = (status) => {
     switch (status) {
       case "PENDING_RP_APPROVAL":
         return "bg-amber-50 text-amber-800 border border-amber-200";
+      case "SUBMITTED_TO_PROVIDER":
+        return "bg-sky-50 text-sky-800 border border-sky-200";
       case "APPROVED":
         return "bg-emerald-50 text-emerald-800 border border-emerald-200";
       case "REJECTED":
@@ -216,12 +253,22 @@ export default function OrderDetails() {
     // eslint-disable-next-line
   }, [id]);
 
+  // ✅ NEW: Poll while waiting for provider decision (non-breaking)
+  useEffect(() => {
+    if (!order?.id) return;
+   if (effectiveStatus(order) !== "SUBMITTED_TO_PROVIDER") return;
+    const t = setInterval(() => {
+      load();
+    }, 12000); // every 12s
+
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status]);
+
   // ✅ When order loads, prefill feedback form fields (for edit mode) safely
   useEffect(() => {
     if (!order) return;
 
-    // Only prefill when we enter edit mode later; however,
-    // we set sensible defaults here from backend if present.
     const q =
       order.qualityRating ??
       order.feedbackQuality ??
@@ -235,12 +282,10 @@ export default function OrderDetails() {
     const v =
       order.valueRating ?? order.feedbackValue ?? order.feedback?.value ?? 5;
 
-    // If backend stores category ratings, align defaults:
     setQualityRating(Number(q) || 5);
     setCommunicationRating(Number(c) || 5);
     setValueRating(Number(v) || 5);
 
-    // Anonymous flag (if exists)
     const anon =
       order.feedbackAnonymous ??
       order.anonymousFeedback ??
@@ -248,7 +293,6 @@ export default function OrderDetails() {
       false;
     setAnonymousFeedback(Boolean(anon));
 
-    // Existing overall rating/comment (if exists)
     if (order.rating != null) setRating(Number(order.rating) || 5);
     if (order.feedbackComment != null) setComment(String(order.feedbackComment));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,9 +308,6 @@ export default function OrderDetails() {
 
       try {
         setSupplierAvgLoading(true);
-
-        // Assumption: your backend already supports GET /orders (you use /orders page elsewhere)
-        // We keep it best-effort: if endpoint isn't available, UI simply won't show the average.
         const res = await API.get("/orders");
         const all = Array.isArray(res.data) ? res.data : res.data?.content || [];
 
@@ -294,7 +335,6 @@ export default function OrderDetails() {
         const avg = sum / count;
         setSupplierAvg({ avg, count });
       } catch (e) {
-        // non-blocking
         setSupplierAvg(null);
       } finally {
         setSupplierAvgLoading(false);
@@ -306,14 +346,28 @@ export default function OrderDetails() {
   }, [order?.supplierName, order?.supplierId]);
 
   // -------- existing order actions --------
+  // ✅ IMPORTANT: RP action now means "Submit to Provider" (not Provider Approved)
   const approve = async () => {
     try {
       await API.post(`/orders/${id}/approve`);
-      toast.success("Order approved.");
+
+      // ✅ UI safety: immediately show submitted state to avoid confusion even if backend still returns APPROVED
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "SUBMITTED_TO_PROVIDER",
+              approvedAt: prev.approvedAt ?? new Date().toISOString(),
+              approvedBy: prev.approvedBy ?? (localStorage.getItem("username") || prev.approvedBy),
+            }
+          : prev
+      );
+
+      toast.success("Order submitted to provider.");
       load();
     } catch (e) {
       console.error(e);
-      toast.error(errorMessage(e, "Failed to approve order."));
+      toast.error(errorMessage(e, "Failed to submit order to provider."));
     }
   };
 
@@ -339,13 +393,11 @@ export default function OrderDetails() {
   };
 
   const submitFeedback = async () => {
-    // Keep existing validation (rating must be 1-5)
     if (!rating || rating < 1 || rating > 5) {
       toast.error("Overall rating must be 1–5.");
       return;
     }
 
-    // ✅ categories validation
     const cats = [qualityRating, communicationRating, valueRating];
     if (cats.some((x) => !x || x < 1 || x > 5)) {
       toast.error("Category ratings must be 1–5.");
@@ -358,15 +410,11 @@ export default function OrderDetails() {
     }
 
     try {
-      // ✅ Do NOT remove existing logic: still send rating + comment exactly as before.
-      // We add extra fields (backend can ignore if unknown).
       await API.post(
         `/orders/${id}/feedback`,
         {
           rating,
           comment,
-
-          // added fields (safe extension)
           qualityRating,
           communicationRating,
           valueRating,
@@ -497,7 +545,6 @@ export default function OrderDetails() {
     order?.status === "APPROVED" &&
     order?.rating == null;
 
-  // ✅ feedback edit window (24h)
   const canPmEditFeedback =
     role === "PROJECT_MANAGER" &&
     order?.status === "APPROVED" &&
@@ -505,18 +552,13 @@ export default function OrderDetails() {
     String(order?.feedbackCreatedBy || "") === String(currentUsername || "") &&
     withinHours(order?.feedbackCreatedAt, 24);
 
-  // ✅ who can request substitution?
-  // requirement: PM + Supplier Representative
   const canRequestSubstitution =
     (role === "PROJECT_MANAGER" || role === "SUPPLIER_REPRESENTATIVE") &&
     order?.status === "APPROVED";
 
-  // ✅ who can request extension?
-  // requirement: PM only
   const canRequestExtension =
     role === "PROJECT_MANAGER" && order?.status === "APPROVED";
 
-  // ✅ RP approves/rejects change requests
   const changePending = order?.changeStatus === "PENDING";
   const canRpHandleChange = role === "RESOURCE_PLANNER" && changePending;
 
@@ -530,21 +572,24 @@ export default function OrderDetails() {
     );
   }, [order]);
 
-  // ✅ overall rating helper (optional: keep manual, but provide a “sync” button)
   const computedOverall = useMemo(() => {
-    const avg = (Number(qualityRating) + Number(communicationRating) + Number(valueRating)) / 3;
-    // nearest half-star not supported by component, so round to 1 decimal for label
+    const avg =
+      (Number(qualityRating) +
+        Number(communicationRating) +
+        Number(valueRating)) /
+      3;
     return Number.isFinite(avg) ? Math.round(avg * 10) / 10 : null;
   }, [qualityRating, communicationRating, valueRating]);
 
   const startEditFeedback = () => {
-    // Prefill from existing order feedback
     setEditingFeedback(true);
 
     setRating(Number(order?.rating ?? 5) || 5);
     setComment(String(order?.feedbackComment ?? ""));
 
-    setQualityRating(Number(order?.qualityRating ?? order?.feedbackQuality ?? 5) || 5);
+    setQualityRating(
+      Number(order?.qualityRating ?? order?.feedbackQuality ?? 5) || 5
+    );
     setCommunicationRating(
       Number(order?.communicationRating ?? order?.feedbackCommunication ?? 5) || 5
     );
@@ -609,10 +654,10 @@ export default function OrderDetails() {
                     <span
                       className={
                         "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold " +
-                        badgeClass(order.status)
+                        badgeClass(effectiveStatus(order))
                       }
                     >
-                      {order.status}
+                      {statusLabel(effectiveStatus(order))}
                     </span>
 
                     {order.changeStatus && (
@@ -635,6 +680,13 @@ export default function OrderDetails() {
                     • Request ID:{" "}
                     <span className="font-semibold">{order.requestId ?? "-"}</span>
                   </p>
+
+                  {/* ✅ NEW: Wait message */}
+                  {effectiveStatus(order) === "SUBMITTED_TO_PROVIDER" && (
+                    <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">
+                      Waiting for provider decision… This page refreshes automatically.
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -940,7 +992,7 @@ export default function OrderDetails() {
                         RP Approval Required
                       </p>
                       <p className="text-xs text-slate-600">
-                        Review details and approve/reject.
+                        Review details and submit to provider / reject.
                       </p>
                     </div>
                   </div>
@@ -951,7 +1003,7 @@ export default function OrderDetails() {
                       className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition"
                       type="button"
                     >
-                      <FiCheckCircle /> Approve Order
+                      <FiCheckCircle /> Submit to Provider
                     </button>
 
                     <button
@@ -966,7 +1018,7 @@ export default function OrderDetails() {
                     </button>
 
                     <p className="text-[11px] text-slate-500 mt-2">
-                      Approving confirms the service order. Rejecting requires a reason.
+                      Submitting sends the order to the provider for confirmation. Rejecting requires a reason.
                     </p>
                   </div>
                 </div>
@@ -1017,7 +1069,6 @@ export default function OrderDetails() {
                     </p>
                   </div>
 
-                  {/* ✅ Edit window action (24h) */}
                   {canPmEditFeedback && !editingFeedback && (
                     <button
                       onClick={startEditFeedback}
@@ -1080,7 +1131,6 @@ export default function OrderDetails() {
                       </div>
                     </div>
 
-                    {/* Categories (if present) */}
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div className="rounded-xl border border-slate-200 bg-white p-3">
                         <p className="text-[11px] font-semibold text-slate-600">

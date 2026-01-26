@@ -32,8 +32,21 @@ export default function RequestDetails() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const rawRole = localStorage.getItem("role") || "";
-  const role = rawRole.replace("ROLE_", "").trim();
+  // ✅ FIX #1: define getRoleFromToken BEFORE using it (function declaration is hoisted)
+  function getRoleFromToken() {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return "";
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const r = (payload?.role || "").toString().trim();
+      return r.replace("ROLE_", "");
+    } catch {
+      return "";
+    }
+  }
+
+  // ✅ Use computed role everywhere (no runtime "before initialization" error)
+  const role = getRoleFromToken();
   const currentUsername = (localStorage.getItem("username") || "").trim();
 
   const errorMessage = (err, fallback = "Request failed.") => {
@@ -50,7 +63,8 @@ export default function RequestDetails() {
 
   const srLabel = (req) => {
     if (!req) return "-";
-    if (req.requestNumber && String(req.requestNumber).trim()) return req.requestNumber;
+    if (req.requestNumber && String(req.requestNumber).trim())
+      return req.requestNumber;
     if (req.id == null) return "-";
     return `SR-${String(req.id).padStart(6, "0")}`;
   };
@@ -101,7 +115,10 @@ export default function RequestDetails() {
       setMainTab("offers");
       setActiveTab("offers");
       setTimeout(() => {
-        offersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        offersRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       }, 150);
       return;
     }
@@ -110,7 +127,10 @@ export default function RequestDetails() {
       setMainTab("offers");
       setActiveTab("evaluation");
       setTimeout(() => {
-        offersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        offersRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       }, 150);
       return;
     }
@@ -132,6 +152,12 @@ export default function RequestDetails() {
 
   // ------------------- RP actions -------------------
   const finalApprove = async (offerId) => {
+    // ✅ FIX #2: use `role` (already computed) instead of calling getRoleFromToken() again
+    if (role !== "RESOURCE_PLANNER") {
+      toast.error("Forbidden: only Resource Planner can create order.");
+      return;
+    }
+
     try {
       const res = await API.post(`/requests/offers/${offerId}/order`);
       toast.success("Service order created.");
@@ -706,7 +732,10 @@ export default function RequestDetails() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {roles.map((r, idx) => (
-                        <tr key={idx} className={idx % 2 ? "bg-white" : "bg-slate-50/40"}>
+                        <tr
+                          key={idx}
+                          className={idx % 2 ? "bg-white" : "bg-slate-50/40"}
+                        >
                           <td className="px-3 py-2">{r.domain || "-"}</td>
                           <td className="px-3 py-2">{r.roleName || "-"}</td>
                           <td className="px-3 py-2">{r.technology || "-"}</td>
@@ -812,7 +841,9 @@ export default function RequestDetails() {
                             ? "bg-white text-slate-900 ring-white/40"
                             : "bg-white/20 text-white ring-white/25 hover:bg-white/30"
                         }`}
-                        title={evaluations.length === 0 ? "Compute evaluation first" : ""}
+                        title={
+                          evaluations.length === 0 ? "Compute evaluation first" : ""
+                        }
                       >
                         Evaluation
                       </button>
@@ -907,13 +938,19 @@ export default function RequestDetails() {
 
                                 <p className="text-xs text-slate-600 mt-0.5">
                                   Supplier:{" "}
-                                  <span className="font-semibold">{o.supplierName || "-"}</span>
-                                  {o.contractualRelationship ? ` (${o.contractualRelationship})` : ""}
+                                  <span className="font-semibold">
+                                    {o.supplierName || "-"}
+                                  </span>
+                                  {o.contractualRelationship
+                                    ? ` (${o.contractualRelationship})`
+                                    : ""}
                                 </p>
 
                                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
                                   <p>
-                                    <span className="text-slate-500 font-semibold">Daily rate:</span>{" "}
+                                    <span className="text-slate-500 font-semibold">
+                                      Daily rate:
+                                    </span>{" "}
                                     {o.dailyRate ?? "-"} €
                                   </p>
                                   <p>
@@ -923,21 +960,29 @@ export default function RequestDetails() {
                                     {o.travellingCost ?? 0} €
                                   </p>
                                   <p>
-                                    <span className="text-slate-500 font-semibold">Total cost:</span>{" "}
+                                    <span className="text-slate-500 font-semibold">
+                                      Total cost:
+                                    </span>{" "}
                                     <span className="font-semibold text-slate-900">
                                       {o.totalCost ?? "-"} €
                                     </span>
                                   </p>
                                   <p>
-                                    <span className="text-slate-500 font-semibold">Material #:</span>{" "}
+                                    <span className="text-slate-500 font-semibold">
+                                      Material #:
+                                    </span>{" "}
                                     {o.materialNumber || "-"}
                                   </p>
                                   <p>
-                                    <span className="text-slate-500 font-semibold">Subcontractor:</span>{" "}
+                                    <span className="text-slate-500 font-semibold">
+                                      Subcontractor:
+                                    </span>{" "}
                                     {o.subcontractorCompany || "-"}
                                   </p>
                                   <p>
-                                    <span className="text-slate-500 font-semibold">Rep:</span>{" "}
+                                    <span className="text-slate-500 font-semibold">
+                                      Rep:
+                                    </span>{" "}
                                     {o.supplierRepresentative || "-"}
                                   </p>
                                 </div>
@@ -951,7 +996,8 @@ export default function RequestDetails() {
                                         : "bg-red-100 text-red-700"
                                     }`}
                                   >
-                                    Must-have: {o.matchMustHaveCriteria ? "Match" : "No"}
+                                    Must-have:{" "}
+                                    {o.matchMustHaveCriteria ? "Match" : "No"}
                                   </span>
 
                                   <span
@@ -961,7 +1007,8 @@ export default function RequestDetails() {
                                         : "bg-gray-100 text-gray-700"
                                     }`}
                                   >
-                                    Nice-to-have: {o.matchNiceToHaveCriteria ? "Match" : "No"}
+                                    Nice-to-have:{" "}
+                                    {o.matchNiceToHaveCriteria ? "Match" : "No"}
                                   </span>
 
                                   <span

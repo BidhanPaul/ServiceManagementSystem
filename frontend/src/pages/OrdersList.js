@@ -17,6 +17,8 @@ import {
   FiDownload,
   FiArrowUp,
   FiArrowDown,
+  FiSend,
+  FiClock,
 } from "react-icons/fi";
 
 export default function OrdersList() {
@@ -52,10 +54,49 @@ export default function OrdersList() {
     // eslint-disable-next-line
   }, []);
 
+  /**
+   * ✅ UI FIX (non-breaking):
+   * Backend might return APPROVED immediately when RP submits.
+   * We treat it as SUBMITTED_TO_PROVIDER until provider webhook confirms.
+   *
+   * Provider webhook should set approvedBy="PROVIDER_GROUP3" (or similar).
+   * If your backend uses a different value, change it here only.
+   */
+  const effectiveStatus = (o) => {
+    if (!o) return null;
+
+    if (
+      o.status === "APPROVED" &&
+      String(o.approvedBy || "").toUpperCase() !== "PROVIDER_GROUP3"
+    ) {
+      return "SUBMITTED_TO_PROVIDER";
+    }
+
+    return o.status;
+  };
+
+  // ✅ Friendly label (keeps backend values unchanged; only display)
+  const statusLabel = (status) => {
+    switch (status) {
+      case "PENDING_RP_APPROVAL":
+        return "Pending RP Approval";
+      case "SUBMITTED_TO_PROVIDER":
+        return "Submitted to Provider";
+      case "APPROVED":
+        return "Provider Approved";
+      case "REJECTED":
+        return "Provider Rejected";
+      default:
+        return status || "-";
+    }
+  };
+
   const badgeClass = (status) => {
     switch (status) {
       case "PENDING_RP_APPROVAL":
         return "bg-amber-50 text-amber-800 border border-amber-200";
+      case "SUBMITTED_TO_PROVIDER":
+        return "bg-sky-50 text-sky-800 border border-sky-200";
       case "APPROVED":
         return "bg-emerald-50 text-emerald-800 border border-emerald-200";
       case "REJECTED":
@@ -69,6 +110,8 @@ export default function OrdersList() {
     switch (status) {
       case "PENDING_RP_APPROVAL":
         return <FiAlertCircle className="text-amber-600" />;
+      case "SUBMITTED_TO_PROVIDER":
+        return <FiSend className="text-sky-700" />;
       case "APPROVED":
         return <FiCheckCircle className="text-emerald-600" />;
       case "REJECTED":
@@ -101,14 +144,33 @@ export default function OrdersList() {
     return Number.isFinite(t) ? t : 0;
   };
 
+  // ✅ Auto-refresh while any order is waiting on provider
+  const anyWaiting = useMemo(() => {
+    return (orders || []).some((o) => effectiveStatus(o) === "SUBMITTED_TO_PROVIDER");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  useEffect(() => {
+    if (!anyWaiting) return;
+
+    const t = setInterval(() => {
+      load();
+    }, 15000); // every 15s
+
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyWaiting]);
+
   // -------- summary cards --------
   const counts = useMemo(() => {
     const all = orders || [];
-    const pending = all.filter((o) => o.status === "PENDING_RP_APPROVAL").length;
-    const approved = all.filter((o) => o.status === "APPROVED").length;
-    const rejected = all.filter((o) => o.status === "REJECTED").length;
+    const pending = all.filter((o) => effectiveStatus(o) === "PENDING_RP_APPROVAL").length;
+    const submitted = all.filter((o) => effectiveStatus(o) === "SUBMITTED_TO_PROVIDER").length;
+    const approved = all.filter((o) => effectiveStatus(o) === "APPROVED").length;
+    const rejected = all.filter((o) => effectiveStatus(o) === "REJECTED").length;
     const withFeedback = all.filter((o) => o.rating != null).length;
-    return { total: all.length, pending, approved, rejected, withFeedback };
+    return { total: all.length, pending, submitted, approved, rejected, withFeedback };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
   // -------- filtering / search + tabs + sort --------
@@ -119,19 +181,20 @@ export default function OrdersList() {
 
     // keep existing dropdown filter behavior
     if (statusFilter !== "ALL") {
-      list = list.filter((o) => o.status === statusFilter);
+      list = list.filter((o) => effectiveStatus(o) === statusFilter);
     }
 
     // NEW: tab filter (works together; if both set, it narrows down)
     if (activeTab !== "ALL") {
-      list = list.filter((o) => o.status === activeTab);
+      list = list.filter((o) => effectiveStatus(o) === activeTab);
     }
 
     if (text) {
       list = list.filter((o) => {
+        const st = effectiveStatus(o);
         const haystack = [
           o.id,
-          o.status,
+          st,
           o.requestNumber,
           o.requestId,
           o.title,
@@ -150,30 +213,37 @@ export default function OrdersList() {
     const dir = sortDir === "asc" ? 1 : -1;
 
     list.sort((a, b) => {
+      const sa = effectiveStatus(a);
+      const sb = effectiveStatus(b);
+
       if (sortKey === "createdAt") return (toTime(a.createdAt) - toTime(b.createdAt)) * dir;
       if (sortKey === "value") return ((Number(a.contractValue) || 0) - (Number(b.contractValue) || 0)) * dir;
-      if (sortKey === "status") return String(a.status || "").localeCompare(String(b.status || "")) * dir;
+      if (sortKey === "status") return String(sa || "").localeCompare(String(sb || "")) * dir;
       if (sortKey === "orderId") return ((Number(a.id) || 0) - (Number(b.id) || 0)) * dir;
       return 0;
     });
 
     return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, q, statusFilter, activeTab, sortKey, sortDir]);
 
   // -------- CSV export (client-side) --------
   const downloadCSV = () => {
-    const rows = filteredOrders.map((o) => ({
-      id: o.id ?? "",
-      status: o.status ?? "",
-      requestNumber: o.requestNumber ?? "",
-      requestId: o.requestId ?? "",
-      title: o.title ?? "",
-      supplierName: o.supplierName ?? "",
-      specialistName: o.specialistName ?? "",
-      contractValue: o.contractValue ?? "",
-      createdAt: o.createdAt ?? "",
-      rating: o.rating ?? "",
-    }));
+    const rows = filteredOrders.map((o) => {
+      const st = effectiveStatus(o);
+      return {
+        id: o.id ?? "",
+        status: st ?? "",
+        requestNumber: o.requestNumber ?? "",
+        requestId: o.requestId ?? "",
+        title: o.title ?? "",
+        supplierName: o.supplierName ?? "",
+        specialistName: o.specialistName ?? "",
+        contractValue: o.contractValue ?? "",
+        createdAt: o.createdAt ?? "",
+        rating: o.rating ?? "",
+      };
+    });
 
     const headers = Object.keys(rows[0] || { id: "" });
 
@@ -221,9 +291,7 @@ export default function OrdersList() {
         title={`Sort by ${label}`}
       >
         {label}
-        {active ? (
-          sortDir === "desc" ? <FiArrowDown /> : <FiArrowUp />
-        ) : null}
+        {active ? (sortDir === "desc" ? <FiArrowDown /> : <FiArrowUp />) : null}
       </button>
     );
   };
@@ -279,6 +347,14 @@ export default function OrdersList() {
                     </p>
                   </div>
                 </div>
+
+                {/* ✅ Info banner while waiting */}
+                {anyWaiting && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs text-sky-900">
+                    <FiClock className="text-sky-700" />
+                    Some orders are waiting for provider decision. This list refreshes automatically.
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -308,6 +384,7 @@ export default function OrdersList() {
             <div className="mt-4 flex flex-wrap gap-2">
               <Tab label="All" value="ALL" count={counts.total} />
               <Tab label="Pending" value="PENDING_RP_APPROVAL" count={counts.pending} />
+              <Tab label="Submitted" value="SUBMITTED_TO_PROVIDER" count={counts.submitted} />
               <Tab label="Approved" value="APPROVED" count={counts.approved} />
               <Tab label="Rejected" value="REJECTED" count={counts.rejected} />
               <Tab label="Feedback" value="FEEDBACK" count={counts.withFeedback} />
@@ -352,8 +429,9 @@ export default function OrdersList() {
                   >
                     <option value="ALL">All</option>
                     <option value="PENDING_RP_APPROVAL">Pending RP Approval</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="REJECTED">Rejected</option>
+                    <option value="SUBMITTED_TO_PROVIDER">Submitted to Provider</option>
+                    <option value="APPROVED">Provider Approved</option>
+                    <option value="REJECTED">Provider Rejected</option>
                   </select>
                 </div>
               </div>
@@ -411,88 +489,91 @@ export default function OrdersList() {
                         if (activeTab !== "FEEDBACK") return true;
                         return o.rating != null;
                       })
-                      .map((o) => (
-                        <tr
-                          key={o.id}
-                          className="hover:bg-slate-50/80 transition cursor-pointer"
-                          onClick={() => navigate(`/orders/${o.id}`)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") navigate(`/orders/${o.id}`);
-                          }}
-                        >
-                          <td className="py-3 px-4 font-semibold text-slate-900">
-                            #{o.id}
-                          </td>
-
-                          <td className="py-3 px-4">
-                            <span
-                              className={
-                                "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold " +
-                                badgeClass(o.status)
-                              }
-                            >
-                              {statusIcon(o.status)}
-                              {o.status}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4">
-                            <div className="text-xs text-slate-800">
-                              {o.requestNumber || "-"}
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                              ID: {o.requestId ?? "-"}
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-4 text-slate-800">
-                            {o.title || "-"}
-                          </td>
-                          <td className="py-3 px-4 text-slate-800">
-                            {o.supplierName || "-"}
-                          </td>
-                          <td className="py-3 px-4 text-slate-800">
-                            {o.specialistName || "-"}
-                          </td>
-
-                          <td className="py-3 px-4">
-                            <span className="font-semibold text-slate-900">
-                              {fmtMoney(o.contractValue)}
-                            </span>
-                          </td>
-
-                          <td className="py-3 px-4 text-xs text-slate-600">
-                            {fmtDateTime(o.createdAt)}
-                          </td>
-
-                          <td className="py-3 px-4">
-                            {o.rating != null ? (
-                              <span className="text-emerald-700 font-semibold">
-                                ⭐ {o.rating}/5
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 text-xs">
-                                {role === "PROJECT_MANAGER" ? "Not yet" : "-"}
-                              </span>
-                            )}
-                          </td>
-
-                          <td
-                            className="py-3 px-4 text-right"
-                            onClick={(e) => e.stopPropagation()}
+                      .map((o) => {
+                        const st = effectiveStatus(o);
+                        return (
+                          <tr
+                            key={o.id}
+                            className="hover:bg-slate-50/80 transition cursor-pointer"
+                            onClick={() => navigate(`/orders/${o.id}`)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") navigate(`/orders/${o.id}`);
+                            }}
                           >
-                            <button
-                              onClick={() => navigate(`/orders/${o.id}`)}
-                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
-                              type="button"
+                            <td className="py-3 px-4 font-semibold text-slate-900">
+                              #{o.id}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span
+                                className={
+                                  "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold " +
+                                  badgeClass(st)
+                                }
+                              >
+                                {statusIcon(st)}
+                                {statusLabel(st)}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <div className="text-xs text-slate-800">
+                                {o.requestNumber || "-"}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                ID: {o.requestId ?? "-"}
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4 text-slate-800">
+                              {o.title || "-"}
+                            </td>
+                            <td className="py-3 px-4 text-slate-800">
+                              {o.supplierName || "-"}
+                            </td>
+                            <td className="py-3 px-4 text-slate-800">
+                              {o.specialistName || "-"}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span className="font-semibold text-slate-900">
+                                {fmtMoney(o.contractValue)}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 text-xs text-slate-600">
+                              {fmtDateTime(o.createdAt)}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              {o.rating != null ? (
+                                <span className="text-emerald-700 font-semibold">
+                                  ⭐ {o.rating}/5
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 text-xs">
+                                  {role === "PROJECT_MANAGER" ? "Not yet" : "-"}
+                                </span>
+                              )}
+                            </td>
+
+                            <td
+                              className="py-3 px-4 text-right"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              Open <FiChevronRight />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                              <button
+                                onClick={() => navigate(`/orders/${o.id}`)}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                                type="button"
+                              >
+                                Open <FiChevronRight />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

@@ -16,36 +16,70 @@ export default function ServiceRequests() {
   // Reference data
   const [projects, setProjects] = useState([]);
   const [contracts, setContracts] = useState([]);
+
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedContract, setSelectedContract] = useState(null);
-  const [availableRoles, setAvailableRoles] = useState([]);
+
+  // ✅ NEW: project-derived dropdown data (Group-1)
+  const [projectMeta, setProjectMeta] = useState({
+    locations: [],
+    skills: [],
+    roles: [],
+    normalized: null,
+  });
 
   // EDIT MODE
   const [editingId, setEditingId] = useState(null);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState("create"); // "create" | "list"
+  const [activeTab, setActiveTab] = useState("create");
 
   // List controls
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // Prevent toast spam
   const didToastProjectsLoaded = useRef(false);
   const didToastContractsLoaded = useRef(false);
 
   // Track if user edited title manually
   const titleTouchedRef = useRef(false);
 
-  // Scroll to form on edit
-  const formTopRef = useRef(null);
+  // Track if user edited roles manually (prevents overwriting)
+  const rolesTouchedRef = useRef(false);
 
-  // ✅ IMPORTANT: prevent overwriting localStorage before restore finishes
+  // ✅ Track if user edited auto-filled fields manually (so project reselect can update correctly)
+  const taskTouchedRef = useRef(false);
+  const furtherTouchedRef = useRef(false);
+  const startTouchedRef = useRef(false);
+  const endTouchedRef = useRef(false);
+  const locationTouchedRef = useRef(false);
+
+  // ✅ Track if user edited domain manually (so contract reselect can update domain safely)
+  const domainTouchedRef = useRef(false);
+
+  // ✅ Track last auto-filled values so project reselect updates fields
+  // only when the field is still "auto-filled" (or empty).
+  const autoFillRef = useRef({
+    title: "",
+    startDate: "",
+    endDate: "",
+    performanceLocation: "",
+    taskDescription: "",
+    furtherInformation: "",
+  });
+
+  const shouldOverwrite = (currentValue, lastAutoValue) => {
+    const cur = (currentValue ?? "").toString();
+    const last = (lastAutoValue ?? "").toString();
+    // overwrite if empty OR still equals previous auto-fill value
+    return cur.trim() === "" || (last && cur === last);
+  };
+
+  const formTopRef = useRef(null);
   const [hydrated, setHydrated] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
-    // NOTE: if your backend uses other types, keep them; this matches your file
     type: "SINGLE",
 
     projectId: "",
@@ -75,6 +109,7 @@ export default function ServiceRequests() {
   });
 
   const emptyRoleRow = () => ({
+    // keep old key name for backward compatibility w/ localStorage
     selectedContractRole: "",
     domain: "",
     roleName: "",
@@ -95,6 +130,60 @@ export default function ServiceRequests() {
 
   const canAddRole = roles.length < maxRoleRows;
 
+  // --------------------------- SAFE UNWRAP + KEY HELPERS ---------------------------
+  // ✅ Robust unwrap: handles many response shapes so dropdowns don't stay empty
+  const unwrapArray = (body, keys = []) => {
+    if (!body) return [];
+
+    // direct array
+    if (Array.isArray(body)) return body;
+
+    // common shapes
+    if (Array.isArray(body.data)) return body.data;
+    if (Array.isArray(body?.data?.data)) return body.data.data;
+    if (Array.isArray(body?.data?.items)) return body.data.items;
+
+    // named keys
+    for (const k of keys) {
+      if (Array.isArray(body?.[k])) return body[k];
+      if (Array.isArray(body?.data?.[k])) return body.data[k];
+      if (Array.isArray(body?.data?.data?.[k])) return body.data.data[k];
+    }
+
+    // shallow search fallback
+    const candidates = [body, body.data, body.data?.data].filter(Boolean);
+    for (const obj of candidates) {
+      if (obj && typeof obj === "object") {
+        for (const v of Object.values(obj)) {
+          if (Array.isArray(v)) return v;
+        }
+      }
+    }
+
+    return [];
+  };
+
+  // projects (Group-1) often: {projectId, id, projectDescription}
+  const projectValueOf = (p, idx) => p?.projectId || p?.id || p?._id || String(idx);
+  const projectLeftOf = (p, idx) => p?.projectId || p?.id || p?._id || String(idx);
+  const projectRightOf = (p) =>
+    p?.projectDescription || p?.projectName || p?.title || p?.name || "-";
+
+  // contracts (Group-2) sample: {_id, contractType, workflow...provider.name}
+  const contractValueOf = (c, idx) => c?.id || c?._id || c?.referenceNumber || String(idx);
+  const contractSupplierOf = (c) =>
+    c?.supplier ||
+    c?.contractSupplier ||
+    c?.supplierName ||
+    c?.providerName ||
+    c?.workflow?.coordinator?.selectedOffer?.provider?.name ||
+    c?.title ||
+    c?.referenceNumber ||
+    "-";
+
+  // ✅ contractType as Domain (safe)
+  const contractDomainOf = (c) => c?.domain || c?.contractType || "-";
+
   // --------------------------- LOAD DATA ---------------------------
   const loadRequests = async () => {
     try {
@@ -111,16 +200,22 @@ export default function ServiceRequests() {
   const loadProjects = async () => {
     try {
       const res = await API.get("/external/projects");
-      const data = res.data;
-      setProjects(Array.isArray(data) ? data : []);
 
-      if (!didToastProjectsLoaded.current) {
-        toast.success("Projects loaded");
+      // 🔎 Helpful debug if dropdown stays empty
+      console.log("PROJECTS RAW RESPONSE:", res?.data);
+
+      const data = unwrapArray(res?.data, ["projects", "items", "result"]);
+      setProjects(data);
+
+      if (!data.length) {
+        toast.warning("Projects loaded but list is empty (check API response shape).");
+      } else if (!didToastProjectsLoaded.current) {
+        toast.success(`Projects loaded (${data.length})`);
         didToastProjectsLoaded.current = true;
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to load projects");
+      console.error("Failed to load projects", err);
+      toast.error("Failed to load projects (check Network tab: status/URL/auth).");
       setProjects([]);
     }
   };
@@ -128,16 +223,21 @@ export default function ServiceRequests() {
   const loadContracts = async () => {
     try {
       const res = await API.get("/external/contracts");
-      const data = res.data;
-      setContracts(Array.isArray(data) ? data : []);
 
-      if (!didToastContractsLoaded.current) {
-        toast.success("Contracts loaded");
+      console.log("CONTRACTS RAW RESPONSE:", res?.data);
+
+      const data = unwrapArray(res?.data, ["contracts", "items", "result"]);
+      setContracts(data);
+
+      if (!data.length) {
+        toast.warning("Contracts loaded but list is empty (check API response shape).");
+      } else if (!didToastContractsLoaded.current) {
+        toast.success(`Contracts loaded (${data.length})`);
         didToastContractsLoaded.current = true;
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to load contracts");
+      console.error("Failed to load contracts", err);
+      toast.error("Failed to load contracts (check Network tab: status/URL/auth).");
       setContracts([]);
     }
   };
@@ -159,26 +259,40 @@ export default function ServiceRequests() {
 
       const saved = JSON.parse(raw);
 
-      // restore primitives
       if (saved?.form) setForm(saved.form);
       if (saved?.roles?.length) setRoles(saved.roles);
 
-      // restore edit mode
       if (saved?.editingId) setEditingId(saved.editingId);
       else setEditingId(null);
 
-      // restore tab
       if (saved?.activeTab) setActiveTab(saved.activeTab);
 
-      // restore "title touched"
       titleTouchedRef.current = !!saved?.titleTouched;
+      rolesTouchedRef.current = !!saved?.rolesTouched;
+
+      taskTouchedRef.current = !!saved?.taskTouched;
+      furtherTouchedRef.current = !!saved?.furtherTouched;
+      startTouchedRef.current = !!saved?.startTouched;
+      endTouchedRef.current = !!saved?.endTouched;
+      locationTouchedRef.current = !!saved?.locationTouched;
+      domainTouchedRef.current = !!saved?.domainTouched;
+
+      // restore last autofill snapshot if present
+      if (saved?.autoFill) {
+        autoFillRef.current = {
+          title: saved?.autoFill?.title || "",
+          startDate: saved?.autoFill?.startDate || "",
+          endDate: saved?.autoFill?.endDate || "",
+          performanceLocation: saved?.autoFill?.performanceLocation || "",
+          taskDescription: saved?.autoFill?.taskDescription || "",
+          furtherInformation: saved?.autoFill?.furtherInformation || "",
+        };
+      }
     } catch (e) {
       console.warn("Failed to restore SR form state", e);
     } finally {
-      // ✅ allow persisting only AFTER restore attempt is done
       setHydrated(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✅ When projects/contracts arrive, re-link selectedProject/selectedContract from stored ids
@@ -190,24 +304,29 @@ export default function ServiceRequests() {
 
       if (saved?.selectedProjectId && projects.length) {
         const proj = projects.find(
-          (p) =>
+          (p, idx) =>
             String(p.projectId) === String(saved.selectedProjectId) ||
-            String(p.id) === String(saved.selectedProjectId)
+            String(p.id) === String(saved.selectedProjectId) ||
+            String(p._id) === String(saved.selectedProjectId) ||
+            String(projectValueOf(p, idx)) === String(saved.selectedProjectId)
         );
         if (proj) setSelectedProject(proj);
       }
 
       if (saved?.selectedContractId && contracts.length) {
-        const contract = contracts.find((c) => String(c.id) === String(saved.selectedContractId));
-        if (contract) {
-          setSelectedContract(contract);
-          setAvailableRoles(contract?.roles || []);
-        }
+        const contract = contracts.find(
+          (c, idx) =>
+            String(c.id) === String(saved.selectedContractId) ||
+            String(c._id) === String(saved.selectedContractId) ||
+            String(c.referenceNumber) === String(saved.selectedContractId) ||
+            String(contractValueOf(c, idx)) === String(saved.selectedContractId)
+        );
+        if (contract) setSelectedContract(contract);
       }
     } catch {}
   }, [projects, contracts]);
 
-  // ✅ Persist form on every change (works for create + edit) — AFTER HYDRATION
+  // ✅ Persist form on every change — AFTER HYDRATION
   useEffect(() => {
     if (!hydrated) return;
 
@@ -218,8 +337,20 @@ export default function ServiceRequests() {
         editingId,
         activeTab,
         titleTouched: titleTouchedRef.current,
-        selectedProjectId: selectedProject?.projectId || selectedProject?.id || "",
-        selectedContractId: selectedContract?.id || "",
+        rolesTouched: rolesTouchedRef.current,
+
+        taskTouched: taskTouchedRef.current,
+        furtherTouched: furtherTouchedRef.current,
+        startTouched: startTouchedRef.current,
+        endTouched: endTouchedRef.current,
+        locationTouched: locationTouchedRef.current,
+        domainTouched: domainTouchedRef.current,
+
+        selectedProjectId:
+          selectedProject?.projectId || selectedProject?.id || selectedProject?._id || "",
+        selectedContractId:
+          selectedContract?.id || selectedContract?._id || selectedContract?.referenceNumber || "",
+        autoFill: autoFillRef.current, // ✅ persist autofill snapshot
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -230,7 +361,6 @@ export default function ServiceRequests() {
   // --------------------------- HELPERS ---------------------------
   const numOrNull = (v) => (v === "" ? null : Number(v));
 
-  // ✅ SR label helper (backend requestNumber preferred)
   const srLabel = (req) => {
     if (!req) return "-";
     if (req.requestNumber && String(req.requestNumber).trim()) return req.requestNumber;
@@ -238,33 +368,24 @@ export default function ServiceRequests() {
     return `SR-${String(req.id).padStart(6, "0")}`;
   };
 
-  const getTechnologyOptionsFromContractRole = (cr) => {
-    if (!cr) return [];
-    const candidates = [
-      cr.technologies,
-      cr.technologyOptions,
-      cr.technologyLevels,
-      cr.technology,
-      cr.technologyLevel,
-      cr.tech,
-      cr.techStack,
-    ];
+  // ✅ Group-1 role list
+  const projectRoles = projectMeta.roles || [];
 
-    const out = [];
-    for (const val of candidates) {
-      if (!val) continue;
-      if (Array.isArray(val)) val.forEach((x) => out.push(String(x).trim()));
-      else out.push(String(val).trim());
-    }
-    return Array.from(new Set(out.filter(Boolean)));
+  const getProjectRoleObj = (selectedRoleName) =>
+    projectRoles.find((r) => String(r.roleName) === String(selectedRoleName));
+
+  const techOptionsFromProjectRole = (roleObj) => {
+    if (!roleObj) return [];
+    const comps = Array.isArray(roleObj.competencies) ? roleObj.competencies : [];
+    const skills = Array.isArray(projectMeta.skills) ? projectMeta.skills : [];
+    return Array.from(
+      new Set([...comps, ...skills].map((x) => String(x).trim()).filter(Boolean))
+    );
   };
 
-  const getContractRoleObj = (selectedContractRole) =>
-    availableRoles.find((r) => String(r.role) === String(selectedContractRole));
-
   const getTechnologyOptionsForRow = (row) => {
-    const cr = getContractRoleObj(row.selectedContractRole);
-    return getTechnologyOptionsFromContractRole(cr);
+    const pr = getProjectRoleObj(row.selectedContractRole);
+    return techOptionsFromProjectRole(pr);
   };
 
   // --------------------------- HANDLERS ---------------------------
@@ -272,6 +393,13 @@ export default function ServiceRequests() {
     const { name, value } = e.target;
 
     if (name === "title") titleTouchedRef.current = true;
+
+    // ✅ mark manual edits to prevent unwanted overwrites
+    if (name === "taskDescription") taskTouchedRef.current = true;
+    if (name === "furtherInformation") furtherTouchedRef.current = true;
+    if (name === "startDate") startTouchedRef.current = true;
+    if (name === "endDate") endTouchedRef.current = true;
+    if (name === "performanceLocation") locationTouchedRef.current = true;
 
     if (name === "type") {
       setForm((prev) => ({ ...prev, type: value }));
@@ -288,70 +416,230 @@ export default function ServiceRequests() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleProjectSelect = (e) => {
+  // ✅ NEW: when project selected, fetch normalized payload for dropdown + autofill
+  const fetchProjectNormalized = async (projectIdOrId) => {
+    try {
+      const res = await API.get(`/external/projects/${projectIdOrId}/normalized`);
+      return res.data || null;
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load project details (normalized).");
+      return null;
+    }
+  };
+
+  // ✅ FIXED: Reselecting projects now updates auto-filled fields correctly
+  const handleProjectSelect = async (e) => {
     const selectedValue = e.target.value;
 
-    const proj = projects.find(
-      (p) =>
-        String(p.projectId) === String(selectedValue) ||
-        String(p.id) === String(selectedValue)
-    );
-
+    const proj = projects.find((p, idx) => String(projectValueOf(p, idx)) === String(selectedValue));
     setSelectedProject(proj || null);
 
-    setForm((prev) => ({
-      ...prev,
-      projectId: proj?.projectId || "",
-      projectName: proj?.projectDescription || proj?.projectId || "",
+    // cleared selection
+    if (!selectedValue) {
+      setProjectMeta({ locations: [], skills: [], roles: [], normalized: null });
+      setForm((prev) => ({
+        ...prev,
+        projectId: "",
+        projectName: "",
+      }));
 
-      title: titleTouchedRef.current
-        ? prev.title
-        : proj?.projectDescription || proj?.projectId || "",
+      autoFillRef.current = {
+        title: "",
+        startDate: "",
+        endDate: "",
+        performanceLocation: "",
+        taskDescription: "",
+        furtherInformation: "",
+      };
 
-      startDate: proj?.projectStart || prev.startDate,
-      endDate: proj?.projectEnd || prev.endDate,
-      taskDescription: proj?.taskDescription || prev.taskDescription,
+      // reset touched flags (fresh selection later should overwrite)
+      titleTouchedRef.current = false;
+      taskTouchedRef.current = false;
+      furtherTouchedRef.current = false;
+      startTouchedRef.current = false;
+      endTouchedRef.current = false;
+      locationTouchedRef.current = false;
 
-      furtherInformation:
-        prev.furtherInformation ||
-        (proj?.selectedSkills?.length ? `Skills: ${proj.selectedSkills.join(", ")}` : ""),
-    }));
-  };
-
-  const handleContractSelect = (e) => {
-    const contractId = e.target.value;
-    const contract = contracts.find((c) => String(c.id) === String(contractId));
-
-    setSelectedContract(contract || null);
-    setAvailableRoles(contract?.roles || []);
-
-    setForm((prev) => ({
-      ...prev,
-      contractId: contract?.id ? String(contract.id) : "",
-      contractSupplier: contract?.supplier || "",
-    }));
-  };
-
-  const handleRoleContractSelect = (index, selectedRoleName) => {
-    if (!selectedContract) {
-      toast.warning("Select a contract first.");
       return;
     }
 
+    const projectIdOrId = proj?.projectId || proj?.id || proj?._id || "";
+
+    // If no usable ID exists, still update UI but can't fetch normalized
+    if (!projectIdOrId) {
+      setProjectMeta({ locations: [], skills: [], roles: [], normalized: null });
+      setForm((prev) => ({
+        ...prev,
+        projectId: selectedValue || "",
+        projectName: proj ? projectRightOf(proj) : "",
+      }));
+      toast.warning("Selected project has no ID (projectId/id/_id). Cannot load normalized details.");
+      return;
+    }
+
+    const norm = await fetchProjectNormalized(projectIdOrId);
+
+    const locations = Array.isArray(norm?.locations) ? norm.locations : [];
+    const skills = Array.isArray(norm?.skills) ? norm.skills : [];
+    const roleList = Array.isArray(norm?.roles) ? norm.roles : [];
+
+    setProjectMeta({
+      locations,
+      skills,
+      roles: roleList,
+      normalized: norm,
+    });
+
+    // next auto-fill values from this project
+    const nextAutoTitle =
+      norm?.title || proj?.projectDescription || proj?.projectName || proj?.projectId || "";
+
+    const nextAutoStart = norm?.startDate || proj?.projectStart || "";
+    const nextAutoEnd = norm?.endDate || proj?.projectEnd || "";
+    const nextAutoLocation = locations.length ? String(locations[0]) : "";
+
+    // IMPORTANT: list response contains taskDescription, so use that as fallback always
+    const nextAutoTask = norm?.taskDescription || proj?.taskDescription || "";
+
+    const nextAutoFurther =
+      (proj?.links ? `Link: ${proj.links}` : "") +
+      (skills.length ? `${proj?.links ? "\n" : ""}Skills: ${skills.join(", ")}` : "");
+
+    setForm((prev) => {
+      const last = autoFillRef.current;
+
+      const titleCanOverwrite =
+        !titleTouchedRef.current || shouldOverwrite(prev.title, last.title);
+
+      // ✅ overwrite if not manually touched OR still equals previous auto-fill OR empty
+      const startCanOverwrite =
+        !startTouchedRef.current || shouldOverwrite(prev.startDate, last.startDate);
+      const endCanOverwrite =
+        !endTouchedRef.current || shouldOverwrite(prev.endDate, last.endDate);
+      const locCanOverwrite =
+        !locationTouchedRef.current ||
+        shouldOverwrite(prev.performanceLocation, last.performanceLocation);
+      const taskCanOverwrite =
+        !taskTouchedRef.current || shouldOverwrite(prev.taskDescription, last.taskDescription);
+      const furtherCanOverwrite =
+        !furtherTouchedRef.current ||
+        shouldOverwrite(prev.furtherInformation, last.furtherInformation);
+
+      const updated = {
+        ...prev,
+
+        projectId: norm?.projectId || projectIdOrId,
+        projectName:
+          norm?.projectName ||
+          proj?.projectDescription ||
+          proj?.projectName ||
+          proj?.projectId ||
+          "",
+
+        title: titleCanOverwrite ? nextAutoTitle : prev.title,
+
+        startDate: startCanOverwrite ? nextAutoStart : prev.startDate,
+        endDate: endCanOverwrite ? nextAutoEnd : prev.endDate,
+
+        performanceLocation: locCanOverwrite ? nextAutoLocation : prev.performanceLocation,
+
+        taskDescription: taskCanOverwrite ? nextAutoTask : prev.taskDescription,
+        furtherInformation: furtherCanOverwrite ? nextAutoFurther : prev.furtherInformation,
+      };
+
+      // update snapshot (always store the "next auto", used for comparing on next reselect)
+      autoFillRef.current = {
+        title: nextAutoTitle,
+        startDate: nextAutoStart,
+        endDate: nextAutoEnd,
+        performanceLocation: nextAutoLocation,
+        taskDescription: nextAutoTask,
+        furtherInformation: nextAutoFurther,
+      };
+
+      return updated;
+    });
+
+    // ✅ Autofill roles rows from project roles if user hasn't touched roles yet
+    if (!rolesTouchedRef.current) {
+      const desiredRows = roleList.length || 1;
+
+      // respect request type limit
+      const limit = form.type === "MULTI" ? 4 : form.type === "TEAM" ? Infinity : 1;
+      const count = Math.min(desiredRows, limit === Infinity ? desiredRows : limit);
+
+      const rows = [];
+      for (let i = 0; i < count; i++) {
+        const pr = roleList[i];
+        const roleName = pr?.roleName || "";
+        const techOptions = techOptionsFromProjectRole(pr);
+        const defaultTech = techOptions[0] || "";
+
+        rows.push({
+          selectedContractRole: roleName, // keep key name for compatibility
+          domain: "", // domain comes from contract
+          roleName: roleName,
+          technology: defaultTech,
+          experienceLevel: "",
+          manDays: pr?.manDays ?? "",
+          onsiteDays: "",
+        });
+      }
+
+      setRoles(rows.length ? rows : [emptyRoleRow()]);
+    }
+
+    toast.success("Project details loaded (roles + locations)");
+  };
+
+  // ✅ Contract is ONLY reference (Group-2)
+  const handleContractSelect = (e) => {
+    const contractId = e.target.value;
+
+    const contract = contracts.find(
+      (c, idx) => String(contractValueOf(c, idx)) === String(contractId)
+    );
+
+    setSelectedContract(contract || null);
+
+    // ✅ IMPORTANT FIX: keep the select controlled by the same selected value
+    setForm((prev) => ({
+      ...prev,
+      contractId: contractId || "",
+      contractSupplier: contract ? contractSupplierOf(contract) : "",
+    }));
+
+    // ✅ Domain should change when contract changes.
+    // If user never edited domain manually => overwrite all domains.
+    // If user edited domain manually => only fill empty domains.
+    const domain = contract ? contractDomainOf(contract) : "";
+    if (domain && domain !== "-") {
+      setRoles((prev) =>
+        prev.map((r) => {
+          if (!domainTouchedRef.current) return { ...r, domain }; // overwrite all
+          return r.domain ? r : { ...r, domain }; // only fill empty
+        })
+      );
+    }
+  };
+
+  // ✅ Project role selection
+  const handleRoleProjectSelect = (index, selectedRoleName) => {
+    rolesTouchedRef.current = true;
+
     setRoles((prev) => {
       const updated = [...prev];
-      const cr = availableRoles.find((r) => String(r.role) === String(selectedRoleName));
-
-      const techOptions = getTechnologyOptionsFromContractRole(cr);
+      const pr = getProjectRoleObj(selectedRoleName);
+      const techOptions = techOptionsFromProjectRole(pr);
       const defaultTech = techOptions[0] || "";
 
       updated[index] = {
         ...updated[index],
         selectedContractRole: selectedRoleName,
-        roleName: cr?.role || selectedRoleName || "",
-        experienceLevel: cr?.experience || "",
-        domain: selectedContract?.domain || "",
-        technology: defaultTech,
+        roleName: pr?.roleName || selectedRoleName || "",
+        technology: updated[index].technology || defaultTech,
+        manDays: updated[index].manDays || pr?.manDays || "",
       };
 
       return updated;
@@ -359,6 +647,9 @@ export default function ServiceRequests() {
   };
 
   const handleRoleFieldChange = (index, field, value) => {
+    rolesTouchedRef.current = true;
+    if (field === "domain") domainTouchedRef.current = true;
+
     setRoles((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
@@ -372,22 +663,45 @@ export default function ServiceRequests() {
       return;
     }
     if (!canAddRole) return;
+    rolesTouchedRef.current = true;
     setRoles((prev) => [...prev, emptyRoleRow()]);
   };
 
   const removeRoleRow = (index) => {
     if (roles.length === 1) return;
+    rolesTouchedRef.current = true;
     setRoles((prev) => prev.filter((_, i) => i !== index));
   };
 
   // --------------------------- RESET FORM ---------------------------
   const resetForm = () => {
     localStorage.removeItem(STORAGE_KEY);
+
     titleTouchedRef.current = false;
+    rolesTouchedRef.current = false;
+
+    taskTouchedRef.current = false;
+    furtherTouchedRef.current = false;
+    startTouchedRef.current = false;
+    endTouchedRef.current = false;
+    locationTouchedRef.current = false;
+    domainTouchedRef.current = false;
+
+    autoFillRef.current = {
+      title: "",
+      startDate: "",
+      endDate: "",
+      performanceLocation: "",
+      taskDescription: "",
+      furtherInformation: "",
+    };
+
     setEditingId(null);
     setSelectedProject(null);
     setSelectedContract(null);
-    setAvailableRoles([]);
+
+    setProjectMeta({ locations: [], skills: [], roles: [], normalized: null });
+
     setRoles([emptyRoleRow()]);
     setForm({
       title: "",
@@ -417,7 +731,7 @@ export default function ServiceRequests() {
   };
 
   // --------------------------- EDIT (PREFILL) ---------------------------
-  const startEdit = (req) => {
+  const startEdit = async (req) => {
     if (req.status !== "DRAFT") {
       toast.info("Only DRAFT requests can be edited.");
       return;
@@ -430,18 +744,56 @@ export default function ServiceRequests() {
 
     setEditingId(req.id);
 
-    const contract = contracts.find((c) => String(c.id) === String(req.contractId));
+    // contract reference only (support id/_id/referenceNumber)
+    const contract = contracts.find(
+      (c, idx) =>
+        String(contractValueOf(c, idx)) === String(req.contractId) ||
+        String(c.id) === String(req.contractId) ||
+        String(c._id) === String(req.contractId) ||
+        String(c.referenceNumber) === String(req.contractId)
+    );
     setSelectedContract(contract || null);
-    setAvailableRoles(contract?.roles || []);
 
+    // project + normalized to repopulate dropdowns
     const proj = projects.find(
-      (p) =>
+      (p, idx) =>
+        String(projectValueOf(p, idx)) === String(req.projectId) ||
         String(p.projectId) === String(req.projectId) ||
-        String(p.id) === String(req.projectId)
+        String(p.id) === String(req.projectId) ||
+        String(p._id) === String(req.projectId)
     );
     setSelectedProject(proj || null);
 
+    if (req.projectId) {
+      const norm = await fetchProjectNormalized(req.projectId);
+      setProjectMeta({
+        locations: Array.isArray(norm?.locations) ? norm.locations : [],
+        skills: Array.isArray(norm?.skills) ? norm.skills : [],
+        roles: Array.isArray(norm?.roles) ? norm.roles : [],
+        normalized: norm,
+      });
+    }
+
+    // In edit mode, treat fields as user-managed to avoid overwriting
     titleTouchedRef.current = true;
+    rolesTouchedRef.current = true;
+
+    taskTouchedRef.current = true;
+    furtherTouchedRef.current = true;
+    startTouchedRef.current = true;
+    endTouchedRef.current = true;
+    locationTouchedRef.current = true;
+    domainTouchedRef.current = true;
+
+    // snapshot autoFill so reselect logic doesn't overwrite edited draft unexpectedly
+    autoFillRef.current = {
+      title: "",
+      startDate: "",
+      endDate: "",
+      performanceLocation: "",
+      taskDescription: "",
+      furtherInformation: "",
+    };
 
     setForm({
       title: req.title || "",
@@ -519,7 +871,9 @@ export default function ServiceRequests() {
       .filter(Boolean),
 
     mustHaveCriteria: [form.must1, form.must2, form.must3].filter(Boolean),
-    niceToHaveCriteria: [form.nice1, form.nice2, form.nice3, form.nice4, form.nice5].filter(Boolean),
+    niceToHaveCriteria: [form.nice1, form.nice2, form.nice3, form.nice4, form.nice5].filter(
+      Boolean
+    ),
 
     roles: roles.map((r) => ({
       domain: r.domain || null,
@@ -594,8 +948,10 @@ export default function ServiceRequests() {
     }
   };
 
-  const projectLabel = (req) => (req.projectId ? `${req.projectId} – ${req.projectName || ""}` : "-");
-  const contractLabel = (req) => (req.contractId ? `${req.contractSupplier || ""} – ${req.contractId}` : "-");
+  const projectLabel = (req) =>
+    req.projectId ? `${req.projectId} – ${req.projectName || ""}` : "-";
+  const contractLabel = (req) =>
+    req.contractId ? `${req.contractSupplier || ""} – ${req.contractId}` : "-";
 
   const filteredRequests = useMemo(() => {
     const list = requests || [];
@@ -660,12 +1016,9 @@ export default function ServiceRequests() {
         <div className="p-4 sm:p-6">
           <TopNav />
 
-          {/* Page header */}
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
-                Service Requests
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Service Requests</h1>
               <p className="text-sm text-slate-600 mt-1">
                 Create requests, edit drafts, submit for review, and track all statuses.
               </p>
@@ -678,7 +1031,6 @@ export default function ServiceRequests() {
             )}
           </div>
 
-          {/* Sticky header + tabs */}
           <div className="sticky top-0 z-20 pt-2 pb-4 mb-4">
             <div className="bg-gradient-to-b from-slate-50/95 via-slate-50/85 to-transparent backdrop-blur-xl rounded-2xl border border-slate-200/60 shadow-sm px-3 py-3">
               <div className="flex items-center gap-2">
@@ -702,7 +1054,6 @@ export default function ServiceRequests() {
             </div>
           </div>
 
-          {/* CREATE / UPDATE TAB */}
           {activeTab === "create" && (
             <>
               <div ref={formTopRef} />
@@ -711,7 +1062,6 @@ export default function ServiceRequests() {
                 onSubmit={saveRequest}
                 className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6 mb-8 space-y-5"
               >
-                {/* TITLE + TYPE */}
                 <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
                   <div className="lg:col-span-2">
                     <label className="text-xs text-slate-600">Title</label>
@@ -748,39 +1098,51 @@ export default function ServiceRequests() {
                   </div>
                 </div>
 
-                {/* PROJECT / CONTRACT / DATES */}
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="text-xs text-slate-600">Project</label>
-                    {/* ✅ FIX: use form.projectId so it stays selected after refresh */}
                     <select
                       value={form.projectId || ""}
                       onChange={handleProjectSelect}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
                     >
                       <option value="">-- Select project --</option>
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.projectId || p.id}>
-                          {p.projectId} – {p.projectDescription}
-                        </option>
-                      ))}
+                      {projects.map((p, idx) => {
+                        const value = projectValueOf(p, idx);
+                        const left = projectLeftOf(p, idx);
+                        const right = projectRightOf(p);
+
+                        return (
+                          <option key={value} value={value}>
+                            {left} – {right}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-600">Contract</label>
+                    <label className="text-xs text-slate-600">Contract (Group-2 reference only)</label>
                     <select
                       value={form.contractId}
                       onChange={handleContractSelect}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
                     >
                       <option value="">-- Select contract --</option>
-                      {contracts.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.supplier} – {c.domain}
-                        </option>
-                      ))}
+                      {contracts.map((c, idx) => {
+                        const value = contractValueOf(c, idx);
+                        const supplier = contractSupplierOf(c);
+                        const domain = contractDomainOf(c);
+                        return (
+                          <option key={value} value={value}>
+                            {supplier} – {domain}
+                          </option>
+                        );
+                      })}
                     </select>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Roles/technology are taken from the selected project (Group-1).
+                    </p>
                   </div>
 
                   <div>
@@ -806,17 +1168,38 @@ export default function ServiceRequests() {
                   </div>
                 </div>
 
-                {/* LOCATION / OFFERS / CYCLE */}
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="text-xs text-slate-600">Performance Location</label>
-                    <input
-                      type="text"
-                      name="performanceLocation"
-                      value={form.performanceLocation}
-                      onChange={handleChange}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
-                    />
+
+                    {/* ✅ dropdown if project provides locations */}
+                    {projectMeta.locations?.length ? (
+                      <select
+                        name="performanceLocation"
+                        value={form.performanceLocation}
+                        onChange={handleChange}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
+                      >
+                        <option value="">-- Select location --</option>
+                        {projectMeta.locations.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        name="performanceLocation"
+                        value={form.performanceLocation}
+                        onChange={handleChange}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
+                      />
+                    )}
+
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      If the project provides locations, this becomes a dropdown.
+                    </p>
                   </div>
 
                   <div>
@@ -866,7 +1249,7 @@ export default function ServiceRequests() {
                     <div>
                       <h2 className="text-sm font-semibold text-slate-800">Requested Roles</h2>
                       <p className="text-xs text-slate-500">
-                        Add Role only for <b>Multi</b> or <b>Team</b>.
+                        Roles/technology options come from the selected <b>Project</b>.
                       </p>
                     </div>
 
@@ -892,20 +1275,20 @@ export default function ServiceRequests() {
                         <div key={index} className="bg-white rounded-2xl border border-slate-200 p-3">
                           <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-7">
                             <div className="xl:col-span-2">
-                              <label className="text-[11px] text-slate-500">Contract Role</label>
+                              <label className="text-[11px] text-slate-500">Project Role</label>
                               <select
                                 value={r.selectedContractRole}
-                                onChange={(e) => handleRoleContractSelect(index, e.target.value)}
+                                onChange={(e) => handleRoleProjectSelect(index, e.target.value)}
                                 className="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
-                                disabled={!selectedContract}
+                                disabled={!form.projectId}
                               >
                                 <option value="">
-                                  {selectedContract ? "-- select --" : "Select contract first"}
+                                  {form.projectId ? "-- select --" : "Select project first"}
                                 </option>
 
-                                {availableRoles.map((cr) => (
-                                  <option key={cr.role} value={cr.role}>
-                                    {cr.role} ({cr.experience})
+                                {projectRoles.map((pr) => (
+                                  <option key={pr.roleName} value={pr.roleName}>
+                                    {pr.roleName}
                                   </option>
                                 ))}
                               </select>
@@ -955,7 +1338,9 @@ export default function ServiceRequests() {
                               <input
                                 type="text"
                                 value={r.experienceLevel}
-                                onChange={(e) => handleRoleFieldChange(index, "experienceLevel", e.target.value)}
+                                onChange={(e) =>
+                                  handleRoleFieldChange(index, "experienceLevel", e.target.value)
+                                }
                                 className="w-full border border-slate-200 rounded-xl px-2 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
                               />
                             </div>
@@ -976,7 +1361,9 @@ export default function ServiceRequests() {
                                 <input
                                   type="number"
                                   value={r.onsiteDays}
-                                  onChange={(e) => handleRoleFieldChange(index, "onsiteDays", e.target.value)}
+                                  onChange={(e) =>
+                                    handleRoleFieldChange(index, "onsiteDays", e.target.value)
+                                  }
                                   className="w-full border border-slate-200 rounded-xl px-2 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
                                 />
                               </div>
@@ -1008,6 +1395,9 @@ export default function ServiceRequests() {
                     value={form.requiredLanguagesInput}
                     onChange={handleChange}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300/60"
+                    placeholder={
+                      projectMeta.skills?.length ? `Suggestion: ${projectMeta.skills.join(", ")}` : ""
+                    }
                   />
                 </div>
 
@@ -1068,35 +1458,32 @@ export default function ServiceRequests() {
                 </div>
 
                 {/* ACTION BUTTONS */}
-<div className="flex justify-end gap-2">
-  {/* Always available */}
-  <button
-    type="button"
-    onClick={resetForm}
-    className="px-5 py-2 rounded-xl bg-slate-100 text-slate-800 font-semibold hover:bg-slate-200 border border-slate-200"
-  >
-    Clear Draft
-  </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-5 py-2 rounded-xl bg-slate-100 text-slate-800 font-semibold hover:bg-slate-200 border border-slate-200"
+                  >
+                    Clear Draft
+                  </button>
 
-  {/* Only shows if editing */}
-  {editingId && (
-    <button
-      type="button"
-      onClick={resetForm}
-      className="px-5 py-2 rounded-xl bg-slate-100 text-slate-800 font-semibold hover:bg-slate-200 border border-slate-200"
-    >
-      Cancel Edit
-    </button>
-  )}
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-5 py-2 rounded-xl bg-slate-100 text-slate-800 font-semibold hover:bg-slate-200 border border-slate-200"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
 
-  <button
-    type="submit"
-    className="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow"
-  >
-    {editingId ? "Update Draft" : "Create Request"}
-  </button>
-</div>
-
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow"
+                  >
+                    {editingId ? "Update Draft" : "Create Request"}
+                  </button>
+                </div>
               </form>
             </>
           )}
@@ -1104,7 +1491,6 @@ export default function ServiceRequests() {
           {/* LIST TAB */}
           {activeTab === "list" && (
             <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm ring-1 ring-slate-200 p-4">
-              {/* List controls */}
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   <input
@@ -1155,30 +1541,30 @@ export default function ServiceRequests() {
                 </div>
               </div>
 
-              {/* Status summary chips */}
               <div className="flex flex-wrap gap-2 mb-4">
-                {["DRAFT", "IN_REVIEW", "APPROVED_FOR_BIDDING", "BIDDING", "ORDERED", "REJECTED"].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatusFilter(s)}
-                    className={
-                      "text-xs font-semibold px-3 py-1.5 rounded-full border transition " +
-                      (statusFilter === s
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50")
-                    }
-                    title="Filter"
-                  >
-                    {s}{" "}
-                    <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                      {statusCounts[s] || 0}
-                    </span>
-                  </button>
-                ))}
+                {["DRAFT", "IN_REVIEW", "APPROVED_FOR_BIDDING", "BIDDING", "ORDERED", "REJECTED"].map(
+                  (s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatusFilter(s)}
+                      className={
+                        "text-xs font-semibold px-3 py-1.5 rounded-full border transition " +
+                        (statusFilter === s
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50")
+                      }
+                      title="Filter"
+                    >
+                      {s}{" "}
+                      <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                        {statusCounts[s] || 0}
+                      </span>
+                    </button>
+                  )
+                )}
               </div>
 
-              {/* Table */}
               {loading ? (
                 <p className="text-slate-600">Loading...</p>
               ) : (
@@ -1200,9 +1586,7 @@ export default function ServiceRequests() {
                     <tbody className="divide-y divide-slate-100 bg-white">
                       {filteredRequests.map((r) => (
                         <tr key={r.id} className="hover:bg-sky-50/60 transition">
-                          <td className="py-2.5 px-3 font-semibold text-slate-800">
-                            {srLabel(r)}
-                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-800">{srLabel(r)}</td>
 
                           <td className="py-2.5 px-3">{r.title}</td>
                           <td className="py-2.5 px-3">{r.type}</td>
@@ -1222,7 +1606,6 @@ export default function ServiceRequests() {
 
                           <td className="py-2.5 px-3 text-right">
                             <div className="flex justify-end gap-2 flex-wrap">
-                              {/* ✅ FIX: Details opens request details tab */}
                               <button
                                 onClick={() => navigate(`/requests/${r.id}?tab=details`)}
                                 className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow"
@@ -1230,7 +1613,6 @@ export default function ServiceRequests() {
                                 Details
                               </button>
 
-                              {/* ✅ NEW: View Offers opens offers tab */}
                               <button
                                 onClick={() => navigate(`/requests/${r.id}?tab=offers`)}
                                 className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow"
