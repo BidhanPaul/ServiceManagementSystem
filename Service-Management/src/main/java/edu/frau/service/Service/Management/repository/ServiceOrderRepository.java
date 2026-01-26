@@ -1,11 +1,14 @@
 package edu.frau.service.Service.Management.repository;
 
+import edu.frau.service.Service.Management.dto.Group4ChangeDecisionDTO;
+import edu.frau.service.Service.Management.dto.OrderDetailsDTO;
 import edu.frau.service.Service.Management.model.OrderStatus;
 import edu.frau.service.Service.Management.model.ServiceOrder;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
 import java.util.List;
 
@@ -22,6 +25,9 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 
     // ✅ avoid accidental duplicates (one order per request is typical)
     boolean existsByServiceRequestReferenceId(Long requestId);
+
+    Optional<ServiceOrder> findBySelectedOffer_Id(Long offerId);
+
 
     @Modifying
     @Transactional

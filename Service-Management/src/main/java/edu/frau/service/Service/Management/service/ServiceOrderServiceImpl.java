@@ -43,6 +43,25 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
     }
 
+    private void clearPendingChangeFields(ServiceOrder order) {
+        order.setPendingChangeType(null);
+
+        order.setPendingNewSpecialistName(null);
+
+        order.setPendingNewEndDate(null);
+        order.setPendingNewManDays(null);
+        order.setPendingNewContractValue(null);
+
+        order.setPendingChangeComment(null);
+        order.setPendingChangeRequestedBy(null);
+        order.setPendingChangeRequestedAt(null);
+
+        // keep decision fields (decisionBy/decisionAt/rejectionReason) already stored
+        // keep pendingSubstitutionDate for history; if you want to clear it, uncomment:
+        // order.setPendingSubstitutionDate(null);
+    }
+
+
     private OrderDetailsDTO toDTO(ServiceOrder o) {
         OrderDetailsDTO dto = new OrderDetailsDTO();
 
@@ -67,6 +86,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         dto.role = o.getRole();
         dto.manDays = o.getManDays();
         dto.contractValue = o.getContractValue();
+
+        // ✅ NEW: pending substitution date
+        dto.pendingSubstitutionDate =
+                o.getPendingSubstitutionDate() == null ? null : o.getPendingSubstitutionDate().toString();
 
         // selected offer details
         if (o.getSelectedOffer() != null) {
@@ -116,6 +139,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         return dto;
     }
+
 
     private void requireRole(User user, Role role) {
         if (user.getRole() != role) throw new RuntimeException("Forbidden: requires " + role);
@@ -197,7 +221,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalStateException("Only PENDING_RP_APPROVAL can be approved");
         }
 
-        order.setStatus(OrderStatus.APPROVED);
+        // ✅ FIX: RP approval = "Submitted to Provider" (NOT provider-approved)
+        order.setStatus(OrderStatus.SUBMITTED_TO_PROVIDER);
+
+        // keep your audit fields (RP action)
         order.setApprovedAt(Instant.now());
         order.setApprovedBy(rpUsername);
 
@@ -205,12 +232,14 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         ServiceRequest req = saved.getServiceRequestReference();
         if (req != null) {
+            // ✅ Request is ordered now (same as before)
             req.setStatus(RequestStatus.ORDERED);
             req.setBiddingActive(false);
             requestRepository.save(req);
 
+            // ✅ Updated message to match new workflow wording
             notificationService.sendToUsername(req.getRequestedByUsername(),
-                    "Resource Planner approved order for: " + req.getTitle() + " (Order #" + saved.getId() + ")");
+                    "Resource Planner submitted order to provider for: " + req.getTitle() + " (Order #" + saved.getId() + ")");
         }
 
         return toDTO(saved);
@@ -299,6 +328,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         ServiceOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
 
+        if (order.getStatus() != OrderStatus.APPROVED) {
+            throw new IllegalStateException("Change requests are allowed only after the order is APPROVED by provider.");
+        }
+
         if (user.getRole() == Role.PROJECT_MANAGER) {
             ServiceRequest req = order.getServiceRequestReference();
             if (req == null || !user.getUsername().equals(req.getRequestedByUsername())) {
@@ -310,11 +343,28 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalArgumentException("newSpecialistName is required");
         }
 
+        // ✅ Validate substitution date (NEW)
+        if (body.substitutionDate == null) {
+            throw new IllegalArgumentException("substitutionDate is required");
+        }
+
+        if (order.getStartDate() != null && body.substitutionDate.isBefore(order.getStartDate())) {
+            throw new IllegalArgumentException("substitutionDate cannot be before startDate");
+        }
+
+        if (order.getEndDate() != null && body.substitutionDate.isAfter(order.getEndDate())) {
+            throw new IllegalArgumentException("substitutionDate cannot be after endDate");
+        }
+
         ensureNoPendingChange(order);
 
         order.setPendingChangeType(OrderChangeType.SUBSTITUTION);
         order.setPendingChangeStatus(OrderChangeStatus.PENDING);
         order.setPendingNewSpecialistName(body.newSpecialistName.trim());
+
+        // ✅ Store substitution date (NEW)
+        order.setPendingSubstitutionDate(body.substitutionDate);
+
         order.setPendingChangeComment(body.comment);
         order.setPendingChangeRequestedBy(username);
         order.setPendingChangeRequestedAt(Instant.now());
@@ -331,6 +381,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return toDTO(saved);
     }
 
+
     @Override
     public OrderDetailsDTO requestExtension(Long orderId, String username, OrderExtensionRequest body) {
         User user = currentUser();
@@ -341,6 +392,11 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         ServiceOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        if (order.getStatus() != OrderStatus.APPROVED) {
+            throw new IllegalStateException("Change requests are allowed only after the order is APPROVED by provider.");
+        }
+
 
         if (user.getRole() == Role.PROJECT_MANAGER) {
             ServiceRequest req = order.getServiceRequestReference();
@@ -356,9 +412,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         ensureNoPendingChange(order);
 
         // ✅ FIXED sanity checks (manDays=int, contractValue=double -> never null)
-        if (order.getStartDate() != null && body.newEndDate.isBefore(order.getStartDate())) {
-            throw new IllegalArgumentException("newEndDate cannot be before startDate");
+        if (order.getEndDate() != null && !body.newEndDate.isAfter(order.getEndDate())) {
+            throw new IllegalArgumentException("newEndDate must be after current endDate");
         }
+
         if (body.newManDays < order.getManDays()) {
             throw new IllegalArgumentException("newManDays cannot be less than current manDays");
         }
@@ -410,8 +467,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 throw new IllegalStateException("Pending extension data is incomplete.");
             }
             order.setEndDate(order.getPendingNewEndDate());
-            order.setManDays(order.getPendingNewManDays());                 // Integer -> int (safe after null check)
-            order.setContractValue(order.getPendingNewContractValue());     // Double -> double (safe after null check)
+            order.setManDays(order.getPendingNewManDays());
+            order.setContractValue(order.getPendingNewContractValue());
         }
 
         order.setPendingChangeStatus(OrderChangeStatus.APPROVED);
@@ -461,4 +518,90 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         return toDTO(saved);
     }
+
+    @Override
+    public OrderDetailsDTO applyGroup4ChangeDecision(Long orderId, Group4ChangeDecisionDTO body) {
+
+        if (body == null || body.decision == null || body.decision.trim().isEmpty()) {
+            throw new IllegalArgumentException("decision is required");
+        }
+
+        String decision = body.decision.trim().toUpperCase();
+
+        ServiceOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        if (order.getPendingChangeStatus() != OrderChangeStatus.PENDING) {
+            throw new IllegalStateException("No pending change request exists for this order.");
+        }
+
+        if ("ACCEPTED".equals(decision) || "APPROVED".equals(decision)) {
+
+            // Apply change
+            if (order.getPendingChangeType() == OrderChangeType.SUBSTITUTION) {
+
+                if (order.getPendingNewSpecialistName() == null || order.getPendingNewSpecialistName().trim().isEmpty()) {
+                    throw new IllegalStateException("Pending substitution data is incomplete.");
+                }
+
+                order.setSpecialistName(order.getPendingNewSpecialistName());
+
+            } else if (order.getPendingChangeType() == OrderChangeType.EXTENSION) {
+
+                if (order.getPendingNewEndDate() == null
+                        || order.getPendingNewManDays() == null
+                        || order.getPendingNewContractValue() == null) {
+                    throw new IllegalStateException("Pending extension data is incomplete.");
+                }
+
+                order.setEndDate(order.getPendingNewEndDate());
+                order.setManDays(order.getPendingNewManDays());
+                order.setContractValue(order.getPendingNewContractValue());
+
+            } else {
+                throw new IllegalStateException("Unknown pending change type.");
+            }
+
+            order.setPendingChangeStatus(OrderChangeStatus.APPROVED);
+            order.setPendingChangeDecisionBy("GROUP4");
+            order.setPendingChangeDecisionAt(Instant.now());
+            order.setPendingChangeRejectionReason(null);
+
+            // clear pending request payload
+            clearPendingChangeFields(order);
+
+        } else if ("REJECTED".equals(decision)) {
+
+            order.setPendingChangeStatus(OrderChangeStatus.REJECTED);
+            order.setPendingChangeDecisionBy("GROUP4");
+            order.setPendingChangeDecisionAt(Instant.now());
+            order.setPendingChangeRejectionReason(
+                    body.reason != null ? body.reason : "Rejected"
+            );
+
+            // clear pending request payload (keeps rejection reason above)
+            clearPendingChangeFields(order);
+
+        } else {
+            throw new IllegalArgumentException("Invalid decision: " + body.decision + " (use ACCEPTED or REJECTED)");
+        }
+
+        ServiceOrder saved = orderRepository.save(order);
+
+        // optional notification to PM
+        ServiceRequest req = saved.getServiceRequestReference();
+        if (req != null) {
+            if (saved.getPendingChangeStatus() == OrderChangeStatus.APPROVED) {
+                notificationService.sendToUsername(req.getRequestedByUsername(),
+                        "Group4 accepted order change for Order #" + saved.getId());
+            } else if (saved.getPendingChangeStatus() == OrderChangeStatus.REJECTED) {
+                notificationService.sendToUsername(req.getRequestedByUsername(),
+                        "Group4 rejected order change for Order #" + saved.getId()
+                                + " (Reason: " + saved.getPendingChangeRejectionReason() + ")");
+            }
+        }
+
+        return toDTO(saved);
+    }
+
 }

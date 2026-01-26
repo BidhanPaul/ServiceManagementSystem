@@ -5,9 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,17 +14,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtService jwtService;
+    private final JwtService jwtService;
+    private final CustomUserDetailsService userDetailsService;
 
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
+    public JwtAuthFilter(JwtService jwtService, CustomUserDetailsService userDetailsService) {
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -35,15 +35,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // ✅ CRITICAL FIX:
-        // Do NOT run JWT logic on preflight requests.
-        // Preflight must return CORS headers, not auth checks.
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // ✅ Also skip JWT logic for public auth endpoints
         String path = request.getServletPath();
         if (path != null && path.startsWith("/api/auth/")) {
             filterChain.doFilter(request, response);
@@ -51,16 +47,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String authHeader = request.getHeader("Authorization");
-        String username = null;
-        String token = null;
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-            try {
-                username = jwtService.extractUsername(token);
-            } catch (Exception ex) {
-                // Invalid token - ignore and continue
-            }
+        String token = authHeader.substring(7);
+
+        String username;
+        try {
+            username = jwtService.extractUsername(token);
+        } catch (Exception ex) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -69,27 +68,38 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (jwtService.isTokenValid(token, userDetails.getUsername())) {
 
-                // Convert roles → ensure they have ROLE_ prefix
-                List<GrantedAuthority> updatedAuthorities = userDetails.getAuthorities()
-                        .stream()
-                        .map(auth -> new SimpleGrantedAuthority(
-                                auth.getAuthority().startsWith("ROLE_")
-                                        ? auth.getAuthority()
-                                        : "ROLE_" + auth.getAuthority()
-                        ))
-                        .collect(Collectors.toList());
+                // ✅ Use role claim, and normalize safely
+                String roleClaim = null;
+                try {
+                    roleClaim = jwtService.extractRole(token);
+                } catch (Exception ignored) {}
+
+                if (roleClaim == null || roleClaim.trim().isEmpty()) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // ✅ FIX: Normalize role claim so "Resource Planner" / "RESOURCE-PLANNER" works
+                String r = roleClaim.trim().toUpperCase()
+                        .replace('-', '_')
+                        .replace(' ', '_');
+
+                // ✅ Build authorities in BOTH forms to avoid mismatch
+                // If token says RESOURCE_PLANNER -> add RESOURCE_PLANNER and ROLE_RESOURCE_PLANNER
+                // If token says ROLE_RESOURCE_PLANNER -> add ROLE_RESOURCE_PLANNER and RESOURCE_PLANNER
+                List<SimpleGrantedAuthority> auths = new ArrayList<>();
+                if (r.startsWith("ROLE_")) {
+                    auths.add(new SimpleGrantedAuthority(r));
+                    auths.add(new SimpleGrantedAuthority(r.substring("ROLE_".length())));
+                } else {
+                    auths.add(new SimpleGrantedAuthority(r));
+                    auths.add(new SimpleGrantedAuthority("ROLE_" + r));
+                }
 
                 UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                updatedAuthorities
-                        );
+                        new UsernamePasswordAuthenticationToken(userDetails, null, auths);
 
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }

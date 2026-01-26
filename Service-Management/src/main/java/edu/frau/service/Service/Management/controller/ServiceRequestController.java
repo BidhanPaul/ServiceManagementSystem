@@ -4,6 +4,7 @@ import edu.frau.service.Service.Management.model.*;
 import edu.frau.service.Service.Management.repository.UserRepository;
 import edu.frau.service.Service.Management.service.RequestService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -79,8 +80,12 @@ public class ServiceRequestController {
 
     @PutMapping("/{id}/submit")
     public ResponseEntity<ServiceRequest> submit(@PathVariable Long id) {
-        return ResponseEntity.ok(requestService.submitForReview(id, "system"));
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = (auth != null && auth.isAuthenticated()) ? auth.getName() : "system";
+        return ResponseEntity.ok(requestService.submitForReview(id, username));
     }
+
+
 
     @PutMapping("/{id}/approve")
     public ResponseEntity<ServiceRequest> approve(@PathVariable Long id) {
@@ -127,8 +132,21 @@ public class ServiceRequestController {
 
     @PostMapping("/offers/{offerId}/order")
     public ResponseEntity<ServiceOrder> createOrder(@PathVariable Long offerId) {
-        return ResponseEntity.ok(requestService.createServiceOrderFromOffer(offerId, "system"));
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        String username = "system";
+        if (auth != null
+                && auth.isAuthenticated()
+                && !(auth instanceof AnonymousAuthenticationToken)
+                && auth.getName() != null
+                && !auth.getName().trim().isEmpty()) {
+            username = auth.getName();
+        }
+
+        return ResponseEntity.ok(requestService.createServiceOrderFromOffer(offerId, username));
     }
+
 
     @PostMapping("/{id}/pull-provider-offers")
     public ResponseEntity<String> pullProviderOffers(@PathVariable Long id) {

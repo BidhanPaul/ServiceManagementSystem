@@ -34,9 +34,6 @@ public class SecurityConfig {
         this.publicApiKeyFilter = publicApiKeyFilter;
     }
 
-    /**
-     * ✅ Ensures OPTIONS preflight always gets CORS headers.
-     */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsFilter corsFilter(@Qualifier("corsConfigurationSource") CorsConfigurationSource source) {
@@ -53,10 +50,8 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ allow all CORS preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Public endpoints (docs + auth)
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
@@ -70,35 +65,21 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
 
-                        // ==========================================================
-                        // ✅ PUBLIC READ (MUST BE FREE)
-                        // ==========================================================
-                        // Your existing public requests API
+                        // PUBLIC READ
                         .requestMatchers(HttpMethod.GET, "/api/requests/**").permitAll()
-
-                        // ✅ Explicitly free these two (so nothing can accidentally override)
                         .requestMatchers(HttpMethod.GET, "/api/public/offers").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/public/evaluations").permitAll()
-
-                        // ✅ Free any other GET under /api/public (reporting endpoints)
                         .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
 
-                        // ==========================================================
-                        // ✅ PUBLIC WRITE (ONLY 3 endpoints)
-                        // API key filter enforces header: ServiceRequestbids3a
-                        // ==========================================================
+                        // PUBLIC WRITE (API key filter protects these)
                         .requestMatchers(HttpMethod.POST, "/api/public/bids").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/public/order-changes/extension").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/public/order-changes/substitution").permitAll()
 
-                        // ==========================================================
-                        // ✅ Your existing public offer submit (current flow)
-                        // ==========================================================
+                        // existing public offer submit
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/offers").permitAll()
 
-                        // ==========================================================
-                        // ❌ KEEP RESTRICTED (internal-only decisions)
-                        // ==========================================================
+                        // KEEP RESTRICTED (internal)
                         .requestMatchers(HttpMethod.POST, "/api/requests/*/pull-provider-offers")
                         .hasAnyRole("RESOURCE_PLANNER", "PROCUREMENT_OFFICER", "ADMIN")
 
@@ -111,13 +92,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/reject")
                         .hasAnyRole("PROCUREMENT_OFFICER", "ADMIN")
 
-                        .requestMatchers(HttpMethod.POST, "/api/requests/**").hasRole("PROJECT_MANAGER")
+                        // ✅ IMPORTANT FIX: only creating a request is PROJECT_MANAGER
+                        .requestMatchers(HttpMethod.POST, "/api/requests").hasRole("PROJECT_MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/requests/").hasRole("PROJECT_MANAGER")
+
                         .requestMatchers(HttpMethod.PUT, "/api/requests/*/reactivate").hasRole("PROJECT_MANAGER")
 
-                        .requestMatchers(HttpMethod.PUT, "/api/requests/*/offers/*/select")
-                        .hasRole("PROJECT_MANAGER")
-
-                        .requestMatchers(HttpMethod.POST, "/api/requests/offers/*/order")
+                        // ✅ FIXED ORDER ENDPOINT (Spring 6 compatible)
+                        // Controller: POST /api/requests/offers/{offerId}/order
+                        .requestMatchers(HttpMethod.POST, "/api/requests/offers/{offerId}/order")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/resource-planner/**")
@@ -145,18 +128,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/user/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/notifications/admin").hasRole("ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/external/**").authenticated()
+                        // ✅ IMPORTANT: External must load dropdowns without JWT
+                        .requestMatchers(HttpMethod.GET, "/api/external/**").permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/integrations/group3/**").permitAll()
+
 
                         .anyRequest().authenticated()
                 )
 
-                // ✅ needed if you ever use H2 console
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
-
-                // ✅ API KEY filter must run BEFORE JWT filter
                 .addFilterBefore(publicApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
-
-                // ✅ JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -166,7 +148,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // If allowCredentials=true, you cannot use "*" in allowedOrigins.
         config.setAllowCredentials(true);
 
         config.setAllowedOriginPatterns(List.of(
@@ -180,7 +161,6 @@ public class SecurityConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-
         return source;
     }
 

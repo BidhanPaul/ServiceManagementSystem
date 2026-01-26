@@ -9,10 +9,10 @@ import edu.frau.service.Service.Management.repository.OfferEvaluationRepository;
 import edu.frau.service.Service.Management.repository.ServiceOfferRepository;
 import edu.frau.service.Service.Management.repository.ServiceRequestRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class OfferEvaluationServiceImpl implements OfferEvaluationService {
@@ -42,7 +42,14 @@ public class OfferEvaluationServiceImpl implements OfferEvaluationService {
         return toDtoWithRank(rows);
     }
 
+    /**
+     * ✅ FIX:
+     * - @Transactional makes delete/save atomic
+     * - Upsert per offer_id (update if exists, insert if not)
+     * - PESSIMISTIC lock prevents double-click/concurrent duplicate insert
+     */
     @Override
+    @Transactional
     public List<OfferEvaluationDTO> computeEvaluationsForRequest(Long requestId, String computedBy) {
 
         ServiceRequest req = requestRepository.findById(requestId)
@@ -52,23 +59,32 @@ public class OfferEvaluationServiceImpl implements OfferEvaluationService {
         List<ServiceOffer> offers = offerRepository.findByServiceRequestId(requestId);
 
         if (offers.isEmpty()) {
-            // nothing to compute
             evaluationRepository.deleteByServiceRequestId(requestId);
             return List.of();
         }
 
-        // remove old computations (keeps it clean for demos)
-        evaluationRepository.deleteByServiceRequestId(requestId);
+        // ✅ IMPORTANT:
+        // Remove the "delete then insert" pattern (can race & break unique constraint).
+        // Instead we update existing rows (per offer_id) or create if missing.
+        List<OfferEvaluation> evals = new ArrayList<>();
 
         // 1) compute eligibility + techScore first
-        List<OfferEvaluation> evals = new ArrayList<>();
         for (ServiceOffer offer : offers) {
-            OfferEvaluation row = new OfferEvaluation();
+
+            // ✅ lock the evaluation row (if it exists) to prevent concurrent inserts
+            OfferEvaluation row = evaluationRepository
+                    .findWithLockByServiceOfferId(offer.getId())
+                    .orElseGet(OfferEvaluation::new);
+
             row.setServiceRequest(req);
             row.setServiceOffer(offer);
+
             row.setComputedAt(Instant.now());
             row.setComputedBy(computedBy);
             row.setAlgorithmVersion(ALGO_VERSION);
+
+            // always reset recommendation on recompute
+            row.setRecommended(false);
 
             GateResult gate = gateOffer(offer);
             row.setEligible(gate.eligible);
@@ -89,6 +105,10 @@ public class OfferEvaluationServiceImpl implements OfferEvaluationService {
             TechResult tech = computeTech(offer);
             row.setTechScore(tech.techScore);
             row.setBreakdownJson(toJson(tech.breakdown));
+
+            // commercial + final will be computed after we know minCost
+            row.setCommercialScore(0);
+            row.setFinalScore(0);
 
             evals.add(row);
         }
@@ -126,6 +146,7 @@ public class OfferEvaluationServiceImpl implements OfferEvaluationService {
 
         best.ifPresent(b -> b.setRecommended(true));
 
+        // ✅ save updates/inserts safely
         evaluationRepository.saveAll(evals);
 
         return toDtoWithRank(
@@ -233,7 +254,7 @@ public class OfferEvaluationServiceImpl implements OfferEvaluationService {
 
             dto.recommended = e.isRecommended();
 
-            // rank only among eligible offers (enterprise-like)
+            // rank only among eligible offers
             if (e.isEligible()) {
                 dto.rank = rank++;
             } else {

@@ -26,6 +26,9 @@ public interface ServiceOrderService {
 
     OrderDetailsDTO approveChange(Long orderId, String rpUsername);
 
+    OrderDetailsDTO applyGroup4ChangeDecision(Long orderId, Group4ChangeDecisionDTO body);
+
+
     OrderDetailsDTO rejectChange(Long orderId, String rpUsername, OrderChangeRejectRequest body);
 
 }

@@ -3,6 +3,7 @@ package edu.frau.service.Service.Management.service;
 import edu.frau.service.Service.Management.model.ServiceOffer;
 import edu.frau.service.Service.Management.model.ServiceOrder;
 import edu.frau.service.Service.Management.model.ServiceRequest;
+import edu.frau.service.Service.Management.dto.Group3OfferDecisionDTO;
 
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +40,12 @@ public interface RequestService {
     ServiceRequest reactivateBidding(Long requestId);
 
     void pullProviderOffers(Long requestId);
+
+    void applyProviderDecisionFromGroup3(Long offerId, Group3OfferDecisionDTO body);
+
+    ServiceOrder approveOrderById(Long orderId);
+    ServiceOrder rejectOrderById(Long orderId, String reason);
+
 
     ServiceOrder finalApproveAndCreateOrder(Long offerId);
 

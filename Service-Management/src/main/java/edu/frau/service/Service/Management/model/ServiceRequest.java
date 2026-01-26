@@ -1,5 +1,6 @@
 package edu.frau.service.Service.Management.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,6 +30,10 @@ public class ServiceRequest {
     private String projectId;
     private String projectName;
 
+    // ✅ Group-1 flag (frontend/provider sends: "isExternalSearch")
+    @JsonAlias({"isExternalSearch"})
+    private Boolean externalSearch = true;
+
     private String contractId;
     private String contractSupplier;
 
@@ -51,7 +56,6 @@ public class ServiceRequest {
 
     @Column(length = 2000)
     private String taskDescription;
-
 
     @Column(length = 2000)
     private String furtherInformation;
@@ -79,11 +83,10 @@ public class ServiceRequest {
 
     // ---- getters/setters ----
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getRequestNumber() { return requestNumber; }
     public void setRequestNumber(String requestNumber) { this.requestNumber = requestNumber; }
-
-    public void setId(Long id) { this.id = id; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -102,6 +105,10 @@ public class ServiceRequest {
 
     public String getProjectName() { return projectName; }
     public void setProjectName(String projectName) { this.projectName = projectName; }
+
+    // ✅ Group-1 getter/setter
+    public Boolean getExternalSearch() { return externalSearch; }
+    public void setExternalSearch(Boolean externalSearch) { this.externalSearch = externalSearch; }
 
     public String getContractId() { return contractId; }
     public void setContractId(String contractId) { this.contractId = contractId; }

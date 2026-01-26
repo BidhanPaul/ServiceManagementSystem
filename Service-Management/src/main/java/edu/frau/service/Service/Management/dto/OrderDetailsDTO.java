@@ -28,6 +28,9 @@ public class OrderDetailsDTO {
 
     public double contractValue;
 
+    // ✅ NEW FIELD (as String for API output)
+    public String pendingSubstitutionDate;
+
     // from selected offer (if linked)
     public Long offerId;
     public String materialNumber;
@@ -53,7 +56,6 @@ public class OrderDetailsDTO {
     public Instant feedbackCreatedAt;
     public String feedbackCreatedBy;
 
-
     public String pendingChangeType;          // "SUBSTITUTION" | "EXTENSION"
     public String pendingChangeStatus;        // "NONE" | "PENDING" | "APPROVED" | "REJECTED"
 
@@ -71,5 +73,4 @@ public class OrderDetailsDTO {
     public String pendingChangeDecisionAt;
 
     public String pendingChangeRejectionReason;
-
 }

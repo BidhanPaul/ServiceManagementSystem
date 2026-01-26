@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/external") // ✅ IMPORTANT
-@CrossOrigin(origins = "*") // ok for dev
+@RequestMapping("/api/external")
+@CrossOrigin(origins = "*")
 public class ExternalReferenceController {
 
     private final ExternalReferenceService externalReferenceService;
@@ -17,7 +17,7 @@ public class ExternalReferenceController {
         this.externalReferenceService = externalReferenceService;
     }
 
-    // ---- Projects ----
+    // ---- Projects (RAW) ----
     @GetMapping("/projects")
     public List<Map<String, Object>> getAllProjects() {
         return externalReferenceService.getAllProjects();
@@ -28,7 +28,23 @@ public class ExternalReferenceController {
         return externalReferenceService.getProject(id);
     }
 
-    // ---- Contracts ----
+    // ---- Projects (Normalized for autofill) ----
+    @GetMapping("/projects/{id}/normalized")
+    public Map<String, Object> getProjectNormalized(@PathVariable String id) {
+        return externalReferenceService.getProjectNormalized(id);
+    }
+
+    @GetMapping("/projects/{id}/roles")
+    public List<Map<String, Object>> getProjectRoles(@PathVariable String id) {
+        return externalReferenceService.getProjectRoles(id);
+    }
+
+    @GetMapping("/projects/{id}/locations")
+    public List<String> getProjectLocations(@PathVariable String id) {
+        return externalReferenceService.getProjectLocations(id);
+    }
+
+    // ---- Contracts (Group-2) ----
     @GetMapping("/contracts")
     public List<Map<String, Object>> getAllContracts() {
         return externalReferenceService.getAllContracts();

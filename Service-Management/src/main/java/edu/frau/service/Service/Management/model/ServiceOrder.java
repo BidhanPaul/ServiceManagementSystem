@@ -37,6 +37,8 @@ public class ServiceOrder {
     private int manDays;
     private double contractValue;
 
+    private LocalDate pendingSubstitutionDate;
+
     // ✅ Enterprise lifecycle
     @Enumerated(EnumType.STRING)
     private OrderStatus status = OrderStatus.PENDING_RP_APPROVAL;
@@ -87,6 +89,15 @@ public class ServiceOrder {
     public ServiceOrder() {}
 
     // ---------------- GETTERS & SETTERS ----------------
+
+    public LocalDate getPendingSubstitutionDate() {
+        return pendingSubstitutionDate;
+    }
+
+    public void setPendingSubstitutionDate(LocalDate pendingSubstitutionDate) {
+        this.pendingSubstitutionDate = pendingSubstitutionDate;
+    }
+
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
