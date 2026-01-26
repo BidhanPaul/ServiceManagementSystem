@@ -103,7 +103,13 @@ public class RequestServiceImpl implements RequestService {
         if (auth == null || !auth.isAuthenticated()) {
             throw new RuntimeException("No authenticated user");
         }
-        return auth.getName();
+
+        String name = auth.getName();
+        if (name == null || name.isBlank() || "anonymousUser".equals(name)) {
+            throw new RuntimeException("No authenticated user");
+        }
+
+        return name;
     }
 
     private User getCurrentUser() {
@@ -111,6 +117,25 @@ public class RequestServiceImpl implements RequestService {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
     }
+
+    // ✅ NEW: safe helpers for public endpoints
+    private String getCurrentUsernameOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return null;
+
+        String name = auth.getName();
+        if (name == null || name.isBlank() || "anonymousUser".equals(name)) return null;
+
+        return name;
+    }
+
+    private User getCurrentUserOrNull() {
+        String username = getCurrentUsernameOrNull();
+        if (username == null) return null;
+
+        return userRepository.findByUsername(username).orElse(null);
+    }
+
 
     private void ensureBiddingFields(ServiceRequest req) {
         if (req.getBiddingCycleDays() == null || req.getBiddingCycleDays() < 0) {
@@ -424,23 +449,26 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ServiceRequest> getAllRequests() {
-        User current = getCurrentUser();
+        User current = getCurrentUserOrNull();
 
-        // ADMIN + RESOURCE_PLANNER can see all
+        // ✅ Public (no JWT): allow list
+        if (current == null) {
+            return requestRepository.findAll();
+        }
+
         if (current.getRole() == Role.ADMIN || current.getRole() == Role.RESOURCE_PLANNER) {
             return requestRepository.findAll();
         }
 
-        // PROJECT_MANAGER sees only their own requests
         if (current.getRole() == Role.PROJECT_MANAGER) {
             return requestRepository.findAll().stream()
                     .filter(r -> current.getUsername().equals(r.getRequestedByUsername()))
                     .toList();
         }
 
-        // everyone else gets nothing
         return List.of();
     }
+
 
 
     @Override
