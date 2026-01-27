@@ -456,10 +456,14 @@ public class RequestServiceImpl implements RequestService {
             return requestRepository.findAll();
         }
 
-        if (current.getRole() == Role.ADMIN || current.getRole() == Role.RESOURCE_PLANNER) {
+        // ✅ IMPORTANT: Procurement Officer must see all
+        if (current.getRole() == Role.ADMIN
+                || current.getRole() == Role.RESOURCE_PLANNER
+                || current.getRole() == Role.PROCUREMENT_OFFICER) {
             return requestRepository.findAll();
         }
 
+        // ✅ PM sees only their own requests
         if (current.getRole() == Role.PROJECT_MANAGER) {
             return requestRepository.findAll().stream()
                     .filter(r -> current.getUsername().equals(r.getRequestedByUsername()))
@@ -468,6 +472,7 @@ public class RequestServiceImpl implements RequestService {
 
         return List.of();
     }
+
 
 
 
