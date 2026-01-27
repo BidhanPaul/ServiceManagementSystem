@@ -11,13 +11,13 @@ public class ServiceOffer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) // ✅ clients cannot POST/SET id
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
-    // NEW → Link offer to its service request
+    // ✅ Link offer to service request
     @ManyToOne
     @JoinColumn(name = "service_request_id")
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) // ✅ clients cannot POST/SET serviceRequest
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private ServiceRequest serviceRequest;
 
     private String specialistName;
@@ -27,94 +27,155 @@ public class ServiceOffer {
     private double travellingCost;
     private double totalCost;
 
-    private String contractualRelationship; // Employee, Freelancer, Subcontractor
+    private String contractualRelationship;
     private String subcontractorCompany;
 
     private boolean matchMustHaveCriteria;
     private boolean matchNiceToHaveCriteria;
     private boolean matchLanguageSkills;
 
-    // NEW FIELDS (required for creating service order)
     private String supplierName;
     private String supplierRepresentative;
 
-    public ServiceOffer() {}
+    // ✅ CRITICAL: provider system offer ID (Group3 / Group4)
+    @Column(name = "provider_offer_id", unique = true)
+    private Long providerOfferId;
 
-    public ServiceOffer(Long id, ServiceRequest serviceRequest, String specialistName,
-                        String materialNumber, double dailyRate, double travellingCost,
-                        double totalCost, String contractualRelationship,
-                        String subcontractorCompany, boolean matchMustHaveCriteria,
-                        boolean matchNiceToHaveCriteria, boolean matchLanguageSkills,
-                        String supplierName, String supplierRepresentative) {
-        this.id = id;
-        this.serviceRequest = serviceRequest;
-        this.specialistName = specialistName;
-        this.materialNumber = materialNumber;
-        this.dailyRate = dailyRate;
-        this.travellingCost = travellingCost;
-        this.totalCost = totalCost;
-        this.contractualRelationship = contractualRelationship;
-        this.subcontractorCompany = subcontractorCompany;
-        this.matchMustHaveCriteria = matchMustHaveCriteria;
-        this.matchNiceToHaveCriteria = matchNiceToHaveCriteria;
-        this.matchLanguageSkills = matchLanguageSkills;
-        this.supplierName = supplierName;
-        this.supplierRepresentative = supplierRepresentative;
-    }
+    public ServiceOffer() {}
 
     // --------------------------
     //   GETTERS & SETTERS
     // --------------------------
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public ServiceRequest getServiceRequest() { return serviceRequest; }
-    public void setServiceRequest(ServiceRequest serviceRequest) { this.serviceRequest = serviceRequest; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getSpecialistName() { return specialistName; }
-    public void setSpecialistName(String specialistName) { this.specialistName = specialistName; }
+    public ServiceRequest getServiceRequest() {
+        return serviceRequest;
+    }
 
-    public String getMaterialNumber() { return materialNumber; }
-    public void setMaterialNumber(String materialNumber) { this.materialNumber = materialNumber; }
+    public void setServiceRequest(ServiceRequest serviceRequest) {
+        this.serviceRequest = serviceRequest;
+    }
 
-    public double getDailyRate() { return dailyRate; }
-    public void setDailyRate(double dailyRate) { this.dailyRate = dailyRate; }
+    public String getSpecialistName() {
+        return specialistName;
+    }
 
-    public double getTravellingCost() { return travellingCost; }
-    public void setTravellingCost(double travellingCost) { this.travellingCost = travellingCost; }
+    public void setSpecialistName(String specialistName) {
+        this.specialistName = specialistName;
+    }
 
-    public double getTotalCost() { return totalCost; }
-    public void setTotalCost(double totalCost) { this.totalCost = totalCost; }
+    public String getMaterialNumber() {
+        return materialNumber;
+    }
 
-    public String getContractualRelationship() { return contractualRelationship; }
-    public void setContractualRelationship(String contractualRelationship) { this.contractualRelationship = contractualRelationship; }
+    public void setMaterialNumber(String materialNumber) {
+        this.materialNumber = materialNumber;
+    }
 
-    public String getSubcontractorCompany() { return subcontractorCompany; }
-    public void setSubcontractorCompany(String subcontractorCompany) { this.subcontractorCompany = subcontractorCompany; }
+    public double getDailyRate() {
+        return dailyRate;
+    }
 
-    public boolean isMatchMustHaveCriteria() { return matchMustHaveCriteria; }
-    public void setMatchMustHaveCriteria(boolean matchMustHaveCriteria) { this.matchMustHaveCriteria = matchMustHaveCriteria; }
+    public void setDailyRate(double dailyRate) {
+        this.dailyRate = dailyRate;
+    }
 
-    public boolean isMatchNiceToHaveCriteria() { return matchNiceToHaveCriteria; }
-    public void setMatchNiceToHaveCriteria(boolean matchNiceToHaveCriteria) { this.matchNiceToHaveCriteria = matchNiceToHaveCriteria; }
+    public double getTravellingCost() {
+        return travellingCost;
+    }
 
-    public boolean isMatchLanguageSkills() { return matchLanguageSkills; }
-    public void setMatchLanguageSkills(boolean matchLanguageSkills) { this.matchLanguageSkills = matchLanguageSkills; }
+    public void setTravellingCost(double travellingCost) {
+        this.travellingCost = travellingCost;
+    }
 
-    public String getSupplierName() { return supplierName; }
-    public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
+    public double getTotalCost() {
+        return totalCost;
+    }
 
-    public String getSupplierRepresentative() { return supplierRepresentative; }
-    public void setSupplierRepresentative(String supplierRepresentative) { this.supplierRepresentative = supplierRepresentative; }
+    public void setTotalCost(double totalCost) {
+        this.totalCost = totalCost;
+    }
+
+    public String getContractualRelationship() {
+        return contractualRelationship;
+    }
+
+    public void setContractualRelationship(String contractualRelationship) {
+        this.contractualRelationship = contractualRelationship;
+    }
+
+    public String getSubcontractorCompany() {
+        return subcontractorCompany;
+    }
+
+    public void setSubcontractorCompany(String subcontractorCompany) {
+        this.subcontractorCompany = subcontractorCompany;
+    }
+
+    public boolean isMatchMustHaveCriteria() {
+        return matchMustHaveCriteria;
+    }
+
+    public void setMatchMustHaveCriteria(boolean matchMustHaveCriteria) {
+        this.matchMustHaveCriteria = matchMustHaveCriteria;
+    }
+
+    public boolean isMatchNiceToHaveCriteria() {
+        return matchNiceToHaveCriteria;
+    }
+
+    public void setMatchNiceToHaveCriteria(boolean matchNiceToHaveCriteria) {
+        this.matchNiceToHaveCriteria = matchNiceToHaveCriteria;
+    }
+
+    public boolean isMatchLanguageSkills() {
+        return matchLanguageSkills;
+    }
+
+    public void setMatchLanguageSkills(boolean matchLanguageSkills) {
+        this.matchLanguageSkills = matchLanguageSkills;
+    }
+
+    public String getSupplierName() {
+        return supplierName;
+    }
+
+    public void setSupplierName(String supplierName) {
+        this.supplierName = supplierName;
+    }
+
+    public String getSupplierRepresentative() {
+        return supplierRepresentative;
+    }
+
+    public void setSupplierRepresentative(String supplierRepresentative) {
+        this.supplierRepresentative = supplierRepresentative;
+    }
+
+    // ✅ Provider offer ID accessors
+    public Long getProviderOfferId() {
+        return providerOfferId;
+    }
+
+    public void setProviderOfferId(Long providerOfferId) {
+        this.providerOfferId = providerOfferId;
+    }
 
     @Override
     public String toString() {
         return "ServiceOffer{" +
                 "id=" + id +
+                ", providerOfferId=" + providerOfferId +
                 ", specialistName='" + specialistName + '\'' +
                 ", supplierName='" + supplierName + '\'' +
-                ", representative='" + supplierRepresentative + '\'' +
+                ", supplierRepresentative='" + supplierRepresentative + '\'' +
                 ", totalCost=" + totalCost +
                 '}';
     }

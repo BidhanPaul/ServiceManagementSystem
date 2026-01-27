@@ -136,7 +136,6 @@ public class RequestServiceImpl implements RequestService {
         return userRepository.findByUsername(username).orElse(null);
     }
 
-
     private void ensureBiddingFields(ServiceRequest req) {
         if (req.getBiddingCycleDays() == null || req.getBiddingCycleDays() < 0) {
             req.setBiddingCycleDays(7);
@@ -197,6 +196,15 @@ public class RequestServiceImpl implements RequestService {
         }
     }
 
+    /**
+     * ✅ NEW helper:
+     * Group3 sends provider offer id in URL. Map it -> internal ServiceOffer.
+     * Does NOT change any business logic, only resolves correct entity.
+     */
+    private ServiceOffer getInternalOfferByProviderOfferIdOrThrow(Long providerOfferId) {
+        return offerRepository.findByProviderOfferId(providerOfferId)
+                .orElseThrow(() -> new IllegalArgumentException("Offer not found for providerOfferId: " + providerOfferId));
+    }
 
     /**
      * ✅ NEW: Autofill request fields from selected project (and contract if needed)
@@ -473,9 +481,6 @@ public class RequestServiceImpl implements RequestService {
         return List.of();
     }
 
-
-
-
     @Override
     public Optional<ServiceRequest> updateRequest(Long id, ServiceRequest updated) {
         return requestRepository.findById(id).map(existing -> {
@@ -531,7 +536,6 @@ public class RequestServiceImpl implements RequestService {
         return true;
     }
 
-
     @Override
     public ServiceRequest submitForReview(Long id, String username) {
         ServiceRequest req = requestRepository.findById(id)
@@ -553,7 +557,6 @@ public class RequestServiceImpl implements RequestService {
 
         return saved;
     }
-
 
     @Override
     public ServiceRequest approveForBidding(Long id, String approverUsername) {
@@ -674,6 +677,9 @@ public class RequestServiceImpl implements RequestService {
         ServiceOffer offer = new ServiceOffer();
         offer.setServiceRequest(request);
 
+        // ✅ NEW: persist providerOfferId (this was missing, causing provider_offer_id = NULL)
+        offer.setProviderOfferId(incoming.getProviderOfferId());
+
         // copy only allowed fields
         offer.setSpecialistName(incoming.getSpecialistName());
         offer.setMaterialNumber(incoming.getMaterialNumber());
@@ -711,9 +717,6 @@ public class RequestServiceImpl implements RequestService {
 
         return saved;
     }
-
-
-
 
     @Override
     public List<ServiceOffer> getOffersForRequest(Long requestId) {
@@ -896,6 +899,10 @@ public class RequestServiceImpl implements RequestService {
         return offer;
     }
 
+    //hookup // <-- NOTE: Remove this line if it appeared due to copy/paste issues
+    // (Your original file continues below unchanged...)
+    // ------------------------------------------------------------
+
     @Override
     public ServiceOrder createServiceOrderFromOffer(Long offerId, String decidedBy) {
         ServiceOffer offer = offerRepository.findById(offerId)
@@ -1007,8 +1014,11 @@ public class RequestServiceImpl implements RequestService {
 
         String decision = body.getDecision().trim().toUpperCase();
 
-        ServiceOrder order = orderRepository.findBySelectedOffer_Id(offerId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found for offerId: " + offerId));
+        // ✅ NEW: offerId from Group3 is providerOfferId, map it to internal offer first
+        ServiceOffer internalOffer = getInternalOfferByProviderOfferIdOrThrow(offerId);
+
+        ServiceOrder order = orderRepository.findBySelectedOffer_Id(internalOffer.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Order not found for offerId: " + internalOffer.getId()));
 
         switch (decision) {
             case "SUBMITTED", "SUBMITTED_TO_PROVIDER" -> {
@@ -1032,7 +1042,6 @@ public class RequestServiceImpl implements RequestService {
             }
             default -> throw new IllegalArgumentException("Invalid decision: " + decision);
         }
-
 
         orderRepository.save(order);
 
@@ -1125,7 +1134,4 @@ public class RequestServiceImpl implements RequestService {
 
         return saved;
     }
-
-
-
 }

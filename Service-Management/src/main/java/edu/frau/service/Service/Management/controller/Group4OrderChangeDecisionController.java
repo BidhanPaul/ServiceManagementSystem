@@ -1,7 +1,7 @@
 package edu.frau.service.Service.Management.controller;
 
 
-import edu.frau.service.Service.Management.dto.Group4ChangeDecisionDTO;
+import edu.frau.service.Service.Management.dto.Group3ChangeDecisionDTO;
 import edu.frau.service.Service.Management.dto.OrderDetailsDTO;
 import edu.frau.service.Service.Management.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,7 @@ public class Group4OrderChangeDecisionController {
     @PostMapping("/{orderId}/change/decision")
     public ResponseEntity<OrderDetailsDTO> decide(
             @PathVariable Long orderId,
-            @RequestBody Group4ChangeDecisionDTO body
+            @RequestBody Group3ChangeDecisionDTO body
     ) {
         return ResponseEntity.ok(orderService.applyGroup4ChangeDecision(orderId, body));
     }

@@ -1,7 +1,5 @@
 package edu.frau.service.Service.Management.repository;
 
-import edu.frau.service.Service.Management.dto.Group4ChangeDecisionDTO;
-import edu.frau.service.Service.Management.dto.OrderDetailsDTO;
 import edu.frau.service.Service.Management.model.OrderStatus;
 import edu.frau.service.Service.Management.model.ServiceOrder;
 import jakarta.transaction.Transactional;

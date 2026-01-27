@@ -19,20 +19,25 @@ public class PublicBiddingController {
      * ✅ Public bid endpoint
      * POST /api/public/bids
      *
-     * IMPORTANT:
-     * - We do NOT accept ServiceOffer entity directly (to avoid Hibernate merge/update).
-     * - We build a new ServiceOffer object to force INSERT always.
+     * Provider payload includes offer.id (provider's offer id).
+     * We store that into ServiceOffer.providerOfferId so APPROVE/REJECT can notify Group3 later.
      */
     @PostMapping("/bids")
     public ResponseEntity<ServiceOffer> bid(@RequestBody PublicBidRequest body) {
 
         if (body == null || body.requestId == null || body.offer == null) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(null);
         }
 
-        // ✅ Build a brand-new entity (IGNORE any incoming id / nested objects)
+        // ✅ Provider must send their offer id as offer.id
+        if (body.offer.id == null) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        // ✅ Build a brand-new entity (IGNORE any incoming internal id / nested objects)
         ServiceOffer offer = new ServiceOffer();
-        offer.setId(null); // force INSERT
+        offer.setId(null); // force INSERT (internal DB id)
+        offer.setProviderOfferId(body.offer.id); // ✅ save provider's offer id
 
         offer.setSpecialistName(body.offer.specialistName);
         offer.setMaterialNumber(body.offer.materialNumber);
@@ -51,6 +56,7 @@ public class PublicBiddingController {
         offer.setSupplierName(body.offer.supplierName);
         offer.setSupplierRepresentative(body.offer.supplierRepresentative);
 
+        // ✅ Save offer for the request
         ServiceOffer created = requestService.addOffer(body.requestId, offer);
         return ResponseEntity.ok(created);
     }
@@ -63,8 +69,11 @@ public class PublicBiddingController {
     }
 
     public static class PublicOfferDTO {
-        // NO id here on purpose
-        // NO serviceRequest here on purpose
+        /**
+         * ✅ Provider system offer id.
+         * Provider sends this as offer.id in payload.
+         */
+        public Long id;
 
         public String specialistName;
         public String materialNumber;

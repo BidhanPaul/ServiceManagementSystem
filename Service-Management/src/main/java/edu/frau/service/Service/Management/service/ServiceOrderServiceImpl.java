@@ -6,6 +6,7 @@ import edu.frau.service.Service.Management.repository.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import edu.frau.service.Service.Management.integration.provider.Group3IntegrationClient;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,18 +21,23 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
+    // ✅ NEW
+    private final Group3IntegrationClient group3Client;
+
     public ServiceOrderServiceImpl(
             ServiceOrderRepository orderRepository,
             ServiceOrderFeedbackRepository feedbackRepository,
             ServiceRequestRepository requestRepository,
             UserRepository userRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            Group3IntegrationClient group3Client
     ) {
         this.orderRepository = orderRepository;
         this.feedbackRepository = feedbackRepository;
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.group3Client = group3Client;
     }
 
     // ---------------- helpers ----------------
@@ -61,7 +67,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         // order.setPendingSubstitutionDate(null);
     }
 
-
     private OrderDetailsDTO toDTO(ServiceOrder o) {
         OrderDetailsDTO dto = new OrderDetailsDTO();
 
@@ -87,7 +92,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         dto.manDays = o.getManDays();
         dto.contractValue = o.getContractValue();
 
-        // ✅ NEW: pending substitution date
+        // ✅ pending substitution date (if you have this field in DTO)
         dto.pendingSubstitutionDate =
                 o.getPendingSubstitutionDate() == null ? null : o.getPendingSubstitutionDate().toString();
 
@@ -118,7 +123,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             dto.feedbackCreatedBy = fb.getCreatedBy();
         });
 
-        // ---- change request fields (NEW) ----
+        // ---- change request fields ----
         dto.pendingChangeType = o.getPendingChangeType() == null ? null : o.getPendingChangeType().name();
         dto.pendingChangeStatus = o.getPendingChangeStatus() == null ? null : o.getPendingChangeStatus().name();
 
@@ -140,12 +145,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return dto;
     }
 
-
     private void requireRole(User user, Role role) {
         if (user.getRole() != role) throw new RuntimeException("Forbidden: requires " + role);
     }
 
-    // NEW helper: prevent multiple pending requests
     private void ensureNoPendingChange(ServiceOrder order) {
         if (order.getPendingChangeStatus() == OrderChangeStatus.PENDING) {
             throw new IllegalStateException("A change request is already pending for this order.");
@@ -221,10 +224,38 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalStateException("Only PENDING_RP_APPROVAL can be approved");
         }
 
-        // ✅ FIX: RP approval = "Submitted to Provider" (NOT provider-approved)
+        // ✅ Must have selected offer to notify provider
+        if (order.getSelectedOffer() == null) {
+            throw new IllegalStateException("Order has no selected offer to notify provider.");
+        }
+
+        ServiceOffer selected = order.getSelectedOffer();
+
+        // ✅ IMPORTANT: provider needs providerOfferId (not local DB id)
+        if (selected.getProviderOfferId() == null) {
+            throw new IllegalStateException(
+                    "Selected offer has no providerOfferId; cannot notify provider. " +
+                            "Make sure provider_offer_id is being saved when offers are created/imported."
+            );
+        }
+
+        Long providerOfferId = selected.getProviderOfferId();
+
+        // ✅ RP approves => tell provider ACCEPTED
+        // If this fails, do NOT change local status.
+        try {
+            group3Client.sendDecision(providerOfferId, "ACCEPTED");
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    "Failed to notify Group3 (provider system) about ACCEPTED decision for providerOfferId=" + providerOfferId,
+                    ex
+            );
+        }
+
+        // ✅ After successful provider notification:
         order.setStatus(OrderStatus.SUBMITTED_TO_PROVIDER);
 
-        // keep your audit fields (RP action)
+        // RP audit
         order.setApprovedAt(Instant.now());
         order.setApprovedBy(rpUsername);
 
@@ -232,14 +263,13 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         ServiceRequest req = saved.getServiceRequestReference();
         if (req != null) {
-            // ✅ Request is ordered now (same as before)
             req.setStatus(RequestStatus.ORDERED);
             req.setBiddingActive(false);
             requestRepository.save(req);
 
-            // ✅ Updated message to match new workflow wording
             notificationService.sendToUsername(req.getRequestedByUsername(),
-                    "Resource Planner submitted order to provider for: " + req.getTitle() + " (Order #" + saved.getId() + ")");
+                    "Resource Planner submitted order to provider for: " + req.getTitle()
+                            + " (Order #" + saved.getId() + ")");
         }
 
         return toDTO(saved);
@@ -255,6 +285,28 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         if (order.getStatus() != OrderStatus.PENDING_RP_APPROVAL) {
             throw new IllegalStateException("Only PENDING_RP_APPROVAL can be rejected");
+        }
+
+        // ✅ If an offer was selected, tell provider REJECTED
+        if (order.getSelectedOffer() != null) {
+            ServiceOffer selected = order.getSelectedOffer();
+
+            // ✅ IMPORTANT: provider needs providerOfferId (not local DB id)
+            if (selected.getProviderOfferId() != null) {
+                Long providerOfferId = selected.getProviderOfferId();
+                try {
+                    group3Client.sendDecision(providerOfferId, "REJECTED");
+                } catch (Exception ex) {
+                    throw new IllegalStateException(
+                            "Failed to notify Group3 (provider system) about REJECTED decision for providerOfferId=" + providerOfferId,
+                            ex
+                    );
+                }
+            } else {
+                // Optional: if you want rejection to still succeed locally even if providerOfferId missing
+                // just leave this as a warning (log). If you prefer to hard-fail, throw instead.
+                // log.warn("Selected offer has no providerOfferId; skipping provider REJECTED notification.");
+            }
         }
 
         order.setStatus(OrderStatus.REJECTED);
@@ -273,6 +325,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         return toDTO(saved);
     }
+
+
 
     // ---------------- PM feedback ----------------
 
@@ -313,7 +367,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return toDTO(order);
     }
 
-    // ---------------- Change Requests (NEW) ----------------
+    // ---------------- Change Requests ----------------
 
     @Override
     public OrderDetailsDTO requestSubstitution(Long orderId, String username, OrderSubstitutionRequest body) {
@@ -343,7 +397,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalArgumentException("newSpecialistName is required");
         }
 
-        // ✅ Validate substitution date (NEW)
         if (body.substitutionDate == null) {
             throw new IllegalArgumentException("substitutionDate is required");
         }
@@ -361,8 +414,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         order.setPendingChangeType(OrderChangeType.SUBSTITUTION);
         order.setPendingChangeStatus(OrderChangeStatus.PENDING);
         order.setPendingNewSpecialistName(body.newSpecialistName.trim());
-
-        // ✅ Store substitution date (NEW)
         order.setPendingSubstitutionDate(body.substitutionDate);
 
         order.setPendingChangeComment(body.comment);
@@ -376,11 +427,11 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         ServiceOrder saved = orderRepository.save(order);
 
         notificationService.sendToRole(Role.RESOURCE_PLANNER,
-                "Substitution requested for Order #" + saved.getId() + " → new specialist: " + saved.getPendingNewSpecialistName());
+                "Substitution requested for Order #" + saved.getId()
+                        + " → new specialist: " + saved.getPendingNewSpecialistName());
 
         return toDTO(saved);
     }
-
 
     @Override
     public OrderDetailsDTO requestExtension(Long orderId, String username, OrderExtensionRequest body) {
@@ -397,7 +448,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalStateException("Change requests are allowed only after the order is APPROVED by provider.");
         }
 
-
         if (user.getRole() == Role.PROJECT_MANAGER) {
             ServiceRequest req = order.getServiceRequestReference();
             if (req == null || !user.getUsername().equals(req.getRequestedByUsername())) {
@@ -411,7 +461,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         ensureNoPendingChange(order);
 
-        // ✅ FIXED sanity checks (manDays=int, contractValue=double -> never null)
         if (order.getEndDate() != null && !body.newEndDate.isAfter(order.getEndDate())) {
             throw new IllegalArgumentException("newEndDate must be after current endDate");
         }
@@ -459,7 +508,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             throw new IllegalStateException("No pending change request to approve.");
         }
 
-        // ✅ Apply change safely (manDays=int, contractValue=double)
         if (order.getPendingChangeType() == OrderChangeType.SUBSTITUTION) {
             order.setSpecialistName(order.getPendingNewSpecialistName());
         } else if (order.getPendingChangeType() == OrderChangeType.EXTENSION) {
@@ -520,7 +568,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     @Override
-    public OrderDetailsDTO applyGroup4ChangeDecision(Long orderId, Group4ChangeDecisionDTO body) {
+    public OrderDetailsDTO applyGroup4ChangeDecision(Long orderId, Group3ChangeDecisionDTO body) {
 
         if (body == null || body.decision == null || body.decision.trim().isEmpty()) {
             throw new IllegalArgumentException("decision is required");
@@ -537,7 +585,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         if ("ACCEPTED".equals(decision) || "APPROVED".equals(decision)) {
 
-            // Apply change
             if (order.getPendingChangeType() == OrderChangeType.SUBSTITUTION) {
 
                 if (order.getPendingNewSpecialistName() == null || order.getPendingNewSpecialistName().trim().isEmpty()) {
@@ -567,7 +614,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             order.setPendingChangeDecisionAt(Instant.now());
             order.setPendingChangeRejectionReason(null);
 
-            // clear pending request payload
             clearPendingChangeFields(order);
 
         } else if ("REJECTED".equals(decision)) {
@@ -579,7 +625,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                     body.reason != null ? body.reason : "Rejected"
             );
 
-            // clear pending request payload (keeps rejection reason above)
             clearPendingChangeFields(order);
 
         } else {
@@ -588,7 +633,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         ServiceOrder saved = orderRepository.save(order);
 
-        // optional notification to PM
         ServiceRequest req = saved.getServiceRequestReference();
         if (req != null) {
             if (saved.getPendingChangeStatus() == OrderChangeStatus.APPROVED) {
@@ -603,5 +647,4 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         return toDTO(saved);
     }
-
 }
