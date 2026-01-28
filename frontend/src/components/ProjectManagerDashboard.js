@@ -174,15 +174,28 @@ const ProjectManagerDashboard = () => {
     }, {});
   }, [requests]);
 
-  const barLabels = useMemo(() => {
-    const latest = [...(requests || [])].slice(-12);
-    return latest.map((r) => r.title);
+  // ✅ latest 12 requests (kept as your logic)
+  const latest12 = useMemo(() => {
+    return [...(requests || [])].slice(-12);
   }, [requests]);
 
+  // ✅ full titles for tooltip
+  const barFullLabels = useMemo(() => {
+    return latest12.map((r) => r.title || "(Untitled)");
+  }, [latest12]);
+
+  // ✅ short labels to prevent unreadable axis text
+  const barLabels = useMemo(() => {
+    const MAX = 18;
+    return barFullLabels.map((t) => {
+      const s = String(t || "");
+      return s.length > MAX ? s.slice(0, MAX - 1) + "…" : s;
+    });
+  }, [barFullLabels]);
+
   const barValues = useMemo(() => {
-    const latest = [...(requests || [])].slice(-12);
-    return latest.map((r) => r.roles?.length || 0);
-  }, [requests]);
+    return latest12.map((r) => r.roles?.length || 0);
+  }, [latest12]);
 
   const pieData = useMemo(
     () => ({
@@ -198,6 +211,7 @@ const ProjectManagerDashboard = () => {
             "#fb7185",
             "#94a3b8",
           ],
+          borderWidth: 0,
         },
       ],
     }),
@@ -212,10 +226,69 @@ const ProjectManagerDashboard = () => {
           label: "Roles",
           data: barValues,
           backgroundColor: "#6366f1",
+          borderRadius: 8,
+          maxBarThickness: 26,
         },
       ],
     }),
     [barLabels, barValues]
+  );
+
+  // ✅ Chart options to fix the “squished / unreadable” bar chart
+  // - keep fixed container height
+  // - disable aspect ratio so it fills the card
+  // - show horizontal bars to avoid overlapping labels
+  // - tooltip shows full request title
+  const pieOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { boxWidth: 18, boxHeight: 10 },
+        },
+        tooltip: { enabled: true },
+      },
+    }),
+    []
+  );
+
+  const barOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: "y", // ✅ horizontal bars = readable labels
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const idx = items?.[0]?.dataIndex ?? 0;
+              return barFullLabels[idx] || "";
+            },
+            label: (item) => `Roles: ${item.parsed?.x ?? item.raw ?? 0}`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            font: { size: 11 },
+          },
+          grid: { display: false },
+        },
+        x: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { color: "rgba(148, 163, 184, 0.25)" },
+        },
+      },
+    }),
+    [barFullLabels]
   );
 
   // ---------- NO USER CASE ----------
@@ -283,7 +356,8 @@ const ProjectManagerDashboard = () => {
                 Project Manager Panel
               </h1>
               <p className="text-sm text-slate-600 mt-1">
-                Create and track service requests for your projects and monitor supplier offers.
+                Create and track service requests for your projects and monitor
+                supplier offers.
               </p>
             </div>
 
@@ -326,8 +400,17 @@ const ProjectManagerDashboard = () => {
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-sky-50 text-sky-700 rounded-2xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M3 7h18M3 12h18M3 17h18" strokeLinecap="round" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M3 7h18M3 12h18M3 17h18"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </div>
               <div className="min-w-0">
@@ -342,7 +425,13 @@ const ProjectManagerDashboard = () => {
 
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-sky-50 text-sky-700 rounded-2xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
                   <rect x="3" y="4" width="18" height="16" rx="2" />
                 </svg>
               </div>
@@ -358,7 +447,13 @@ const ProjectManagerDashboard = () => {
 
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-blue-50 text-blue-700 rounded-2xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M12 6v6l4 2" strokeLinecap="round" />
                   <circle cx="12" cy="12" r="9" />
                 </svg>
@@ -375,7 +470,13 @@ const ProjectManagerDashboard = () => {
 
             <div className="bg-white/90 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-4 flex items-center gap-4 border border-slate-100">
               <div className="p-3 bg-indigo-50 text-indigo-700 rounded-2xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
                   <circle cx="12" cy="12" r="9" />
                   <path d="M8 12h8M12 8v8" strokeLinecap="round" />
                 </svg>
@@ -405,8 +506,10 @@ const ProjectManagerDashboard = () => {
                       <h2 className="text-sm font-semibold text-slate-900 mb-1">
                         Requests by Status
                       </h2>
-                      <div className="h-52 flex items-center justify-center">
-                        <Pie data={pieData} />
+
+                      {/* ✅ IMPORTANT: maintainAspectRatio false requires a real height */}
+                      <div className="h-52">
+                        <Pie data={pieData} options={pieOptions} />
                       </div>
                     </div>
 
@@ -414,8 +517,10 @@ const ProjectManagerDashboard = () => {
                       <h2 className="text-sm font-semibold text-slate-900 mb-1">
                         Roles Requested (Latest 12 Requests)
                       </h2>
-                      <div className="h-52 flex items-center justify-center">
-                        <Bar data={barData} />
+
+                      {/* ✅ IMPORTANT: maintainAspectRatio false requires a real height */}
+                      <div className="h-52">
+                        <Bar data={barData} options={barOptions} />
                       </div>
                     </div>
                   </section>
@@ -425,7 +530,8 @@ const ProjectManagerDashboard = () => {
                       Quick Tips
                     </h2>
                     <p className="text-sm text-slate-600 mt-1">
-                      Tabs are sticky now — you can switch sections without scrolling back up.
+                      Tabs are sticky now — you can switch sections without
+                      scrolling back up.
                     </p>
                   </div>
                 </>
@@ -464,14 +570,18 @@ const ProjectManagerDashboard = () => {
                           {myRequests.map((r) => {
                             const offers = offersByRequestId[r.id] || [];
                             return (
-                              <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                              <tr
+                                key={r.id}
+                                className="hover:bg-slate-50/60 transition-colors"
+                              >
                                 <td className="py-2.5 px-3 align-middle">
                                   <div className="min-w-0">
                                     <div className="font-medium text-slate-900 truncate">
                                       {r.title}
                                     </div>
                                     <div className="text-[11px] text-slate-500 truncate">
-                                      {offers.length} offer(s) • {r.roles?.length || 0} role(s)
+                                      {offers.length} offer(s) •{" "}
+                                      {r.roles?.length || 0} role(s)
                                     </div>
                                   </div>
                                 </td>
@@ -499,7 +609,9 @@ const ProjectManagerDashboard = () => {
                                 <td className="py-2.5 px-3 align-middle">
                                   <div className="flex justify-end flex-wrap gap-1.5">
                                     <button
-                                      onClick={() => navigate(`/requests/${r.id}`)}
+                                      onClick={() =>
+                                        navigate(`/requests/${r.id}`)
+                                      }
                                       className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800"
                                       type="button"
                                     >
@@ -551,16 +663,23 @@ const ProjectManagerDashboard = () => {
                             <th className="py-2.5 px-3 w-[44%]">Title</th>
                             <th className="py-2.5 px-3 w-[14%]">Type</th>
                             <th className="py-2.5 px-3 w-[18%]">Status</th>
-                            <th className="py-2.5 px-3 w-[14%]">Requested By</th>
+                            <th className="py-2.5 px-3 w-[14%]">
+                              Requested By
+                            </th>
                             <th className="py-2.5 px-3 w-[10%]">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                           {requests.map((r) => (
-                            <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                            <tr
+                              key={r.id}
+                              className="hover:bg-slate-50/60 transition-colors"
+                            >
                               <td className="py-2.5 px-3 align-middle">
                                 <div className="min-w-0">
-                                  <div className="font-medium text-slate-900 truncate">{r.title}</div>
+                                  <div className="font-medium text-slate-900 truncate">
+                                    {r.title}
+                                  </div>
                                   <div className="text-[11px] text-slate-500 truncate">
                                     {projectLabel(r)} • {contractLabel(r)}
                                   </div>
@@ -590,7 +709,9 @@ const ProjectManagerDashboard = () => {
                               <td className="py-2.5 px-3 align-middle">
                                 <div className="flex justify-end">
                                   <button
-                                    onClick={() => navigate(`/requests/${r.id}`)}
+                                    onClick={() =>
+                                      navigate(`/requests/${r.id}`)
+                                    }
                                     className="px-2.5 py-1 text-xs rounded-md bg-slate-900 text-white hover:bg-slate-800"
                                     type="button"
                                   >
@@ -682,10 +803,12 @@ const ProjectManagerDashboard = () => {
                                   >
                                     <div className="min-w-0">
                                       <p className="font-semibold text-slate-800 truncate">
-                                        {o.specialistName || "Unnamed Specialist"}
+                                        {o.specialistName ||
+                                          "Unnamed Specialist"}
                                       </p>
                                       <p className="text-slate-500 break-words">
-                                        Supplier: {o.supplierName} ({o.contractualRelationship})
+                                        Supplier: {o.supplierName} (
+                                        {o.contractualRelationship})
                                       </p>
                                       {o.notes && (
                                         <p className="text-slate-500 mt-0.5 break-words">
@@ -707,7 +830,10 @@ const ProjectManagerDashboard = () => {
                                 {offers.length > 3 && (
                                   <p className="text-[11px] text-slate-500 pt-1">
                                     Showing 3 of {offers.length}. Use{" "}
-                                    <span className="font-semibold">Open Full Offers</span> to view all.
+                                    <span className="font-semibold">
+                                      Open Full Offers
+                                    </span>{" "}
+                                    to view all.
                                   </p>
                                 )}
                               </div>

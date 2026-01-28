@@ -107,6 +107,8 @@ export default function OrderDetails() {
   // substitution form
   const [newSpecialistName, setNewSpecialistName] = useState("");
   const [subReason, setSubReason] = useState("");
+  // ✅ NEW: substitution date field
+  const [substitutionDate, setSubstitutionDate] = useState("");
 
   // extension form
   const [newEndDate, setNewEndDate] = useState("");
@@ -150,47 +152,50 @@ export default function OrderDetails() {
     return `${n.toFixed(2)} €`;
   };
 
-  // ✅ UI FIX: backend might still return APPROVED after RP submits.
-// We treat it as SUBMITTED_TO_PROVIDER until provider system confirms.
-const effectiveStatus = (o) => {
-  if (!o) return null;
+  /**
+   * ✅ UPDATED FLOW (provider group requirement):
+   * - No "submit to provider" pending state in UI.
+   * - RP decision is final from our side: ACCEPTED or REJECTED.
+   *
+   * We keep this helper so the rest of the UI remains unchanged.
+   *
+   * ✅ Compatibility:
+   * If backend still returns SUBMITTED_TO_PROVIDER (legacy), we treat it as APPROVED in UI
+   * because RP "accept" is final now.
+   */
+  const effectiveStatus = (o) => {
+    if (!o) return null;
 
-  // If backend returns APPROVED but it wasn't approved by provider webhook,
-  // show it as "Submitted to Provider" to match the workflow.
-  if (
-    o.status === "APPROVED" &&
-    String(o.approvedBy || "").toUpperCase() !== "PROVIDER_GROUP3"
-  ) {
-    return "SUBMITTED_TO_PROVIDER";
-  }
+    // ✅ legacy compatibility: treat submitted-to-provider as accepted
+    if (o.status === "SUBMITTED_TO_PROVIDER") return "APPROVED";
 
-  return o.status;
-};
+    return o.status;
+  };
 
-
-  // ✅ NEW: human-friendly labels for lifecycle
+  // ✅ human-friendly labels (kept, includes legacy status for compatibility)
+  // ✅ IMPORTANT: for APPROVED show "Accepted (Submitted to Provider)" as requested
   const statusLabel = (status) => {
     switch (status) {
       case "PENDING_RP_APPROVAL":
         return "Pending RP Approval";
       case "SUBMITTED_TO_PROVIDER":
-        return "Submitted to Provider";
+        return "Submitted to Provider"; // legacy/compat only
       case "APPROVED":
-        return "Provider Approved";
+        return "Accepted (Submitted to Provider)";
       case "REJECTED":
-        return "Provider Rejected";
+        return "Rejected";
       default:
         return status || "-";
     }
   };
 
-  // ✅ UPDATED: badge colors (added SUBMITTED_TO_PROVIDER)
+  // ✅ badge colors (kept, includes legacy status for compatibility)
   const badgeClass = (status) => {
     switch (status) {
       case "PENDING_RP_APPROVAL":
         return "bg-amber-50 text-amber-800 border border-amber-200";
       case "SUBMITTED_TO_PROVIDER":
-        return "bg-sky-50 text-sky-800 border border-sky-200";
+        return "bg-sky-50 text-sky-800 border border-sky-200"; // legacy/compat only
       case "APPROVED":
         return "bg-emerald-50 text-emerald-800 border border-emerald-200";
       case "REJECTED":
@@ -252,18 +257,6 @@ const effectiveStatus = (o) => {
     load();
     // eslint-disable-next-line
   }, [id]);
-
-  // ✅ NEW: Poll while waiting for provider decision (non-breaking)
-  useEffect(() => {
-    if (!order?.id) return;
-   if (effectiveStatus(order) !== "SUBMITTED_TO_PROVIDER") return;
-    const t = setInterval(() => {
-      load();
-    }, 12000); // every 12s
-
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.id, order?.status]);
 
   // ✅ When order loads, prefill feedback form fields (for edit mode) safely
   useEffect(() => {
@@ -346,28 +339,33 @@ const effectiveStatus = (o) => {
   }, [order?.supplierName, order?.supplierId]);
 
   // -------- existing order actions --------
-  // ✅ IMPORTANT: RP action now means "Submit to Provider" (not Provider Approved)
+  /**
+   * ✅ UPDATED: RP decision is FINAL for the provider group requirement.
+   * Approve = ACCEPTED (no submit-to-provider pending state).
+   */
   const approve = async () => {
     try {
       await API.post(`/orders/${id}/approve`);
 
-      // ✅ UI safety: immediately show submitted state to avoid confusion even if backend still returns APPROVED
+      // ✅ UI safety: optimistically show ACCEPTED immediately
       setOrder((prev) =>
         prev
           ? {
               ...prev,
-              status: "SUBMITTED_TO_PROVIDER",
+              status: "APPROVED",
               approvedAt: prev.approvedAt ?? new Date().toISOString(),
-              approvedBy: prev.approvedBy ?? (localStorage.getItem("username") || prev.approvedBy),
+              approvedBy:
+                prev.approvedBy ??
+                (localStorage.getItem("username") || prev.approvedBy),
             }
           : prev
       );
 
-      toast.success("Order submitted to provider.");
+      toast.success("Order accepted (submitted to provider).");
       load();
     } catch (e) {
       console.error(e);
-      toast.error(errorMessage(e, "Failed to submit order to provider."));
+      toast.error(errorMessage(e, "Failed to accept order."));
     }
   };
 
@@ -382,6 +380,22 @@ const effectiveStatus = (o) => {
         { reason: rejectReason },
         { headers: { "Content-Type": "application/json" } }
       );
+
+      // ✅ UI safety: optimistically show REJECTED
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "REJECTED",
+              rejectedAt: prev.rejectedAt ?? new Date().toISOString(),
+              rejectedBy:
+                prev.rejectedBy ??
+                (localStorage.getItem("username") || prev.rejectedBy),
+              rejectionReason: rejectReason,
+            }
+          : prev
+      );
+
       toast.success("Order rejected.");
       setRejectOpen(false);
       setRejectReason("");
@@ -444,15 +458,22 @@ const effectiveStatus = (o) => {
     }
 
     try {
+      // ✅ FIXED: endpoint path was broken in your pasted code
       await API.post(
         `/orders/${id}/substitution`,
-        { newSpecialistName, reason: subReason },
+        {
+          newSpecialistName,
+          reason: subReason,
+          // ✅ NEW: include date field (backend can ignore if not used)
+          substitutionDate: substitutionDate || null,
+        },
         { headers: { "Content-Type": "application/json" } }
       );
       toast.success("Substitution request submitted.");
       setSubOpen(false);
       setNewSpecialistName("");
       setSubReason("");
+      setSubstitutionDate("");
       load();
     } catch (e) {
       console.error(e);
@@ -542,22 +563,23 @@ const effectiveStatus = (o) => {
 
   const canPmFeedback =
     role === "PROJECT_MANAGER" &&
-    order?.status === "APPROVED" &&
+    effectiveStatus(order) === "APPROVED" &&
     order?.rating == null;
 
   const canPmEditFeedback =
     role === "PROJECT_MANAGER" &&
-    order?.status === "APPROVED" &&
+    effectiveStatus(order) === "APPROVED" &&
     order?.rating != null &&
     String(order?.feedbackCreatedBy || "") === String(currentUsername || "") &&
     withinHours(order?.feedbackCreatedAt, 24);
 
+  // ✅ For accepted orders, open substitution/extension options
   const canRequestSubstitution =
     (role === "PROJECT_MANAGER" || role === "SUPPLIER_REPRESENTATIVE") &&
-    order?.status === "APPROVED";
+    effectiveStatus(order) === "APPROVED";
 
   const canRequestExtension =
-    role === "PROJECT_MANAGER" && order?.status === "APPROVED";
+    role === "PROJECT_MANAGER" && effectiveStatus(order) === "APPROVED";
 
   const changePending = order?.changeStatus === "PENDING";
   const canRpHandleChange = role === "RESOURCE_PLANNER" && changePending;
@@ -678,15 +700,10 @@ const effectiveStatus = (o) => {
                       {order.requestNumber || "-"}
                     </span>{" "}
                     • Request ID:{" "}
-                    <span className="font-semibold">{order.requestId ?? "-"}</span>
+                    <span className="font-semibold">
+                      {order.requestId ?? "-"}
+                    </span>
                   </p>
-
-                  {/* ✅ NEW: Wait message */}
-                  {effectiveStatus(order) === "SUBMITTED_TO_PROVIDER" && (
-                    <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">
-                      Waiting for provider decision… This page refreshes automatically.
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -864,12 +881,23 @@ const effectiveStatus = (o) => {
                     </p>
 
                     {order.changeType === "SUBSTITUTION" && (
-                      <p className="md:col-span-2">
-                        <span className="text-slate-500 font-semibold">
-                          New specialist:
-                        </span>{" "}
-                        {order.newSpecialistName || "-"}
-                      </p>
+                      <>
+                        <p className="md:col-span-2">
+                          <span className="text-slate-500 font-semibold">
+                            New specialist:
+                          </span>{" "}
+                          {order.newSpecialistName || "-"}
+                        </p>
+                        <p className="md:col-span-2">
+                          <span className="text-slate-500 font-semibold">
+                            Substitution date:
+                          </span>{" "}
+                          {order.substitutionDate ||
+                            order.changeEffectiveDate ||
+                            order.effectiveDate ||
+                            "-"}
+                        </p>
+                      </>
                     )}
 
                     {order.changeType === "EXTENSION" && (
@@ -915,7 +943,7 @@ const effectiveStatus = (o) => {
 
             {/* RIGHT: Action + Audit + Feedback */}
             <div className="xl:col-span-4 space-y-4">
-              {/* ✅ NEW: Change request action panel */}
+              {/* ✅ Change request action panel */}
               {(canRequestSubstitution || canRequestExtension) && (
                 <div className="bg-white/85 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                   <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2">
@@ -925,7 +953,7 @@ const effectiveStatus = (o) => {
                         Order Changes
                       </p>
                       <p className="text-xs text-slate-600">
-                        Request a substitution or extension (after approval).
+                        Request a substitution or extension (after acceptance).
                       </p>
                     </div>
                   </div>
@@ -935,6 +963,7 @@ const effectiveStatus = (o) => {
                       onClick={() => {
                         setNewSpecialistName("");
                         setSubReason("");
+                        setSubstitutionDate("");
                         setSubOpen(true);
                       }}
                       disabled={changePending}
@@ -944,7 +973,9 @@ const effectiveStatus = (o) => {
                           : "bg-indigo-600 text-white hover:bg-indigo-700"
                       }`}
                       type="button"
-                      title={changePending ? "A change request is already pending." : ""}
+                      title={
+                        changePending ? "A change request is already pending." : ""
+                      }
                     >
                       <FiEdit3 /> Request Substitution
                     </button>
@@ -982,17 +1013,17 @@ const effectiveStatus = (o) => {
                 </div>
               )}
 
-              {/* RP APPROVAL PANEL (existing) */}
+              {/* RP DECISION PANEL (updated text, same logic) */}
               {canRpAct && (
                 <div className="bg-white/85 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                   <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2">
                     <FiShield className="text-slate-800" />
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        RP Approval Required
+                        RP Decision Required
                       </p>
                       <p className="text-xs text-slate-600">
-                        Review details and submit to provider / reject.
+                        Accept or reject this order.
                       </p>
                     </div>
                   </div>
@@ -1003,7 +1034,7 @@ const effectiveStatus = (o) => {
                       className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition"
                       type="button"
                     >
-                      <FiCheckCircle /> Submit to Provider
+                      <FiCheckCircle /> Accept Order
                     </button>
 
                     <button
@@ -1018,7 +1049,8 @@ const effectiveStatus = (o) => {
                     </button>
 
                     <p className="text-[11px] text-slate-500 mt-2">
-                      Submitting sends the order to the provider for confirmation. Rejecting requires a reason.
+                      Accepting places the order (submitted to provider).
+                      Rejecting requires a reason.
                     </p>
                   </div>
                 </div>
@@ -1200,7 +1232,9 @@ const effectiveStatus = (o) => {
                     <p className="mt-3 text-xs text-slate-500">
                       Provided by{" "}
                       <span className="font-semibold">
-                        {order.feedbackAnonymous ? "Anonymous" : order.feedbackCreatedBy || "-"}
+                        {order.feedbackAnonymous
+                          ? "Anonymous"
+                          : order.feedbackCreatedBy || "-"}
                       </span>{" "}
                       on {fmtDateTime(order.feedbackCreatedAt)}
                       {canPmEditFeedback && (
@@ -1212,7 +1246,9 @@ const effectiveStatus = (o) => {
                   </div>
                 ) : (
                   !editingFeedback && (
-                    <p className="text-sm text-slate-600 mt-3">No feedback yet.</p>
+                    <p className="text-sm text-slate-600 mt-3">
+                      No feedback yet.
+                    </p>
                   )
                 )}
 
@@ -1403,7 +1439,18 @@ const effectiveStatus = (o) => {
                   value={newSpecialistName}
                   onChange={(e) => setNewSpecialistName(e.target.value)}
                   className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                  placeholder="e.g. John Doe"
+                  placeholder="e.g. DevOps"
+                />
+
+                {/* ✅ NEW: Date field */}
+                <label className="text-xs font-semibold text-slate-600">
+                  Substitution Date
+                </label>
+                <input
+                  type="date"
+                  value={substitutionDate || ""}
+                  onChange={(e) => setSubstitutionDate(e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
 
                 <label className="text-xs font-semibold text-slate-600">

@@ -27,13 +27,16 @@ export default function OrdersList() {
 
   // UI state
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // kept
-  const [activeTab, setActiveTab] = useState("ALL"); // NEW (tabs)
-  const [sortKey, setSortKey] = useState("createdAt"); // NEW
-  const [sortDir, setSortDir] = useState("desc"); // NEW
+  const [statusFilter, setStatusFilter] = useState("ALL"); // kept (backend statuses)
+  const [activeTab, setActiveTab] = useState("ALL"); // upgraded (supports ACCEPTED + FEEDBACK)
+  const [sortKey, setSortKey] = useState("createdAt");
+  const [sortDir, setSortDir] = useState("desc");
 
   const navigate = useNavigate();
-  const role = localStorage.getItem("role");
+
+  // ✅ Normalize role (handles ROLE_PROJECT_MANAGER too)
+  const rawRole = localStorage.getItem("role") || "";
+  const role = rawRole.replace("ROLE_", "");
 
   const load = async () => {
     try {
@@ -55,44 +58,64 @@ export default function OrdersList() {
   }, []);
 
   /**
-   * ✅ UI FIX (non-breaking):
-   * Backend might return APPROVED immediately when RP submits.
-   * We treat it as SUBMITTED_TO_PROVIDER until provider webhook confirms.
+   * ✅ Compatibility helper (non-breaking):
+   * Some backends might return APPROVED early even before provider confirmation.
+   * We keep this logic but upgrade display so user sees "Accepted + Submitted to Provider"
+   * instead of a confusing "Provider Approved" too early.
    *
-   * Provider webhook should set approvedBy="PROVIDER_GROUP3" (or similar).
-   * If your backend uses a different value, change it here only.
+   * Provider confirmation should typically set approvedBy="PROVIDER_GROUP3".
+   * If your backend uses a different value, adjust only here.
+   */
+  const isProviderConfirmed = (o) =>
+    String(o?.approvedBy || "").toUpperCase() === "PROVIDER_GROUP3";
+
+  const isAcceptedSubmitted = (o) => {
+    if (!o) return false;
+    // explicit waiting state
+    if (o.status === "SUBMITTED_TO_PROVIDER") return true;
+    // legacy early-approved-but-not-confirmed case
+    if (o.status === "APPROVED" && !isProviderConfirmed(o)) return true;
+    return false;
+  };
+
+  const isAcceptedConfirmed = (o) => {
+    if (!o) return false;
+    return o.status === "APPROVED" && isProviderConfirmed(o);
+  };
+
+  /**
+   * ✅ effectiveStatus (kept conceptually):
+   * Returns backend statuses (PENDING_RP_APPROVAL, SUBMITTED_TO_PROVIDER, APPROVED, REJECTED),
+   * BUT if APPROVED is not provider-confirmed, we treat it as SUBMITTED_TO_PROVIDER for UI.
    */
   const effectiveStatus = (o) => {
     if (!o) return null;
-
-    if (
-      o.status === "APPROVED" &&
-      String(o.approvedBy || "").toUpperCase() !== "PROVIDER_GROUP3"
-    ) {
-      return "SUBMITTED_TO_PROVIDER";
-    }
-
+    if (o.status === "APPROVED" && !isProviderConfirmed(o)) return "SUBMITTED_TO_PROVIDER";
     return o.status;
   };
 
-  // ✅ Friendly label (keeps backend values unchanged; only display)
-  const statusLabel = (status) => {
-    switch (status) {
+  // ✅ Friendly label (display only)
+  const statusLabel = (o) => {
+    const st = effectiveStatus(o);
+    switch (st) {
       case "PENDING_RP_APPROVAL":
         return "Pending RP Approval";
       case "SUBMITTED_TO_PROVIDER":
-        return "Submitted to Provider";
+        // ✅ new UX: show BOTH semantics as requested
+        return "Accepted • Submitted to Provider";
       case "APPROVED":
-        return "Provider Approved";
+        return "Accepted • Provider Confirmed";
       case "REJECTED":
-        return "Provider Rejected";
+        return "Rejected";
       default:
-        return status || "-";
+        return st || "-";
     }
   };
 
-  const badgeClass = (status) => {
-    switch (status) {
+  // ✅ Badge colors (display only)
+  const badgeClass = (o) => {
+    const st = effectiveStatus(o);
+    switch (st) {
       case "PENDING_RP_APPROVAL":
         return "bg-amber-50 text-amber-800 border border-amber-200";
       case "SUBMITTED_TO_PROVIDER":
@@ -106,8 +129,9 @@ export default function OrdersList() {
     }
   };
 
-  const statusIcon = (status) => {
-    switch (status) {
+  const statusIcon = (o) => {
+    const st = effectiveStatus(o);
+    switch (st) {
       case "PENDING_RP_APPROVAL":
         return <FiAlertCircle className="text-amber-600" />;
       case "SUBMITTED_TO_PROVIDER":
@@ -144,9 +168,9 @@ export default function OrdersList() {
     return Number.isFinite(t) ? t : 0;
   };
 
-  // ✅ Auto-refresh while any order is waiting on provider
+  // ✅ Auto-refresh while any order is waiting on provider (submitted/accepted-submitted)
   const anyWaiting = useMemo(() => {
-    return (orders || []).some((o) => effectiveStatus(o) === "SUBMITTED_TO_PROVIDER");
+    return (orders || []).some((o) => isAcceptedSubmitted(o));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
@@ -155,7 +179,7 @@ export default function OrdersList() {
 
     const t = setInterval(() => {
       load();
-    }, 15000); // every 15s
+    }, 15000);
 
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,12 +188,26 @@ export default function OrdersList() {
   // -------- summary cards --------
   const counts = useMemo(() => {
     const all = orders || [];
+
     const pending = all.filter((o) => effectiveStatus(o) === "PENDING_RP_APPROVAL").length;
-    const submitted = all.filter((o) => effectiveStatus(o) === "SUBMITTED_TO_PROVIDER").length;
-    const approved = all.filter((o) => effectiveStatus(o) === "APPROVED").length;
+    const submitted = all.filter((o) => isAcceptedSubmitted(o)).length;
+    const confirmed = all.filter((o) => isAcceptedConfirmed(o)).length;
+
+    // ✅ "Accepted" = Submitted + Confirmed (as requested)
+    const accepted = submitted + confirmed;
+
     const rejected = all.filter((o) => effectiveStatus(o) === "REJECTED").length;
     const withFeedback = all.filter((o) => o.rating != null).length;
-    return { total: all.length, pending, submitted, approved, rejected, withFeedback };
+
+    return {
+      total: all.length,
+      pending,
+      submitted,
+      confirmed,
+      accepted,
+      rejected,
+      withFeedback,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
@@ -179,14 +217,23 @@ export default function OrdersList() {
 
     let list = [...(orders || [])];
 
-    // keep existing dropdown filter behavior
+    // ✅ dropdown filter uses backend statuses (kept)
     if (statusFilter !== "ALL") {
       list = list.filter((o) => effectiveStatus(o) === statusFilter);
     }
 
-    // NEW: tab filter (works together; if both set, it narrows down)
-    if (activeTab !== "ALL") {
-      list = list.filter((o) => effectiveStatus(o) === activeTab);
+    // ✅ upgraded tab filter (does NOT break dropdown logic)
+    if (activeTab !== "ALL" && activeTab !== "FEEDBACK") {
+      if (activeTab === "ACCEPTED") {
+        list = list.filter((o) => isAcceptedSubmitted(o) || isAcceptedConfirmed(o));
+      } else if (activeTab === "SUBMITTED_TO_PROVIDER") {
+        list = list.filter((o) => isAcceptedSubmitted(o));
+      } else if (activeTab === "APPROVED") {
+        list = list.filter((o) => isAcceptedConfirmed(o));
+      } else {
+        // pending / rejected (direct)
+        list = list.filter((o) => effectiveStatus(o) === activeTab);
+      }
     }
 
     if (text) {
@@ -195,6 +242,7 @@ export default function OrdersList() {
         const haystack = [
           o.id,
           st,
+          statusLabel(o),
           o.requestNumber,
           o.requestId,
           o.title,
@@ -209,16 +257,27 @@ export default function OrdersList() {
       });
     }
 
-    // NEW: sort
+    // ✅ FEEDBACK tab filter (works correctly; no empty-list bug)
+    if (activeTab === "FEEDBACK") {
+      list = list.filter((o) => o.rating != null);
+    }
+
+    // ✅ sort
     const dir = sortDir === "asc" ? 1 : -1;
 
-    list.sort((a, b) => {
-      const sa = effectiveStatus(a);
-      const sb = effectiveStatus(b);
+    const statusSortKey = (o) => {
+      // stable, user-meaningful ordering
+      if (effectiveStatus(o) === "PENDING_RP_APPROVAL") return 1;
+      if (isAcceptedSubmitted(o)) return 2;
+      if (isAcceptedConfirmed(o)) return 3;
+      if (effectiveStatus(o) === "REJECTED") return 4;
+      return 9;
+    };
 
+    list.sort((a, b) => {
       if (sortKey === "createdAt") return (toTime(a.createdAt) - toTime(b.createdAt)) * dir;
       if (sortKey === "value") return ((Number(a.contractValue) || 0) - (Number(b.contractValue) || 0)) * dir;
-      if (sortKey === "status") return String(sa || "").localeCompare(String(sb || "")) * dir;
+      if (sortKey === "status") return (statusSortKey(a) - statusSortKey(b)) * dir;
       if (sortKey === "orderId") return ((Number(a.id) || 0) - (Number(b.id) || 0)) * dir;
       return 0;
     });
@@ -234,6 +293,7 @@ export default function OrdersList() {
       return {
         id: o.id ?? "",
         status: st ?? "",
+        statusLabel: statusLabel(o) ?? "",
         requestNumber: o.requestNumber ?? "",
         requestId: o.requestId ?? "",
         title: o.title ?? "",
@@ -249,7 +309,6 @@ export default function OrdersList() {
 
     const escape = (val) => {
       const s = val == null ? "" : String(val);
-      // wrap in quotes & escape internal quotes
       return `"${s.replace(/"/g, '""')}"`;
     };
 
@@ -322,6 +381,20 @@ export default function OrdersList() {
     );
   };
 
+  // ✅ small stat card (redesign only; no logic changes)
+  const StatCard = ({ title, value, hint, icon }) => (
+    <div className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold text-slate-500">{title}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+          {hint ? <p className="mt-1 text-[11px] text-slate-500">{hint}</p> : null}
+        </div>
+        <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">{icon}</div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -352,7 +425,7 @@ export default function OrdersList() {
                 {anyWaiting && (
                   <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs text-sky-900">
                     <FiClock className="text-sky-700" />
-                    Some orders are waiting for provider decision. This list refreshes automatically.
+                    Some accepted orders are submitted to provider and waiting for confirmation. This list refreshes automatically.
                   </div>
                 )}
               </div>
@@ -380,12 +453,53 @@ export default function OrdersList() {
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Quick stats (upgrade/redesign) */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
+              <StatCard
+                title="Total"
+                value={counts.total}
+                hint="All visible orders"
+                icon={<FiClipboard className="text-slate-800" />}
+              />
+              <StatCard
+                title="Pending"
+                value={counts.pending}
+                hint="Needs RP decision"
+                icon={<FiAlertCircle className="text-amber-600" />}
+              />
+              <StatCard
+                title="Accepted"
+                value={counts.accepted}
+                hint="Submitted + confirmed"
+                icon={<FiCheckCircle className="text-emerald-600" />}
+              />
+              <StatCard
+                title="Submitted"
+                value={counts.submitted}
+                hint="Waiting provider"
+                icon={<FiSend className="text-sky-700" />}
+              />
+              <StatCard
+                title="Rejected"
+                value={counts.rejected}
+                hint="Not proceeding"
+                icon={<FiXCircle className="text-red-600" />}
+              />
+              <StatCard
+                title="Feedback"
+                value={counts.withFeedback}
+                hint="Rated orders"
+                icon={<FiCheckCircle className="text-slate-800" />}
+              />
+            </div>
+
+            {/* Tabs (upgraded) */}
             <div className="mt-4 flex flex-wrap gap-2">
               <Tab label="All" value="ALL" count={counts.total} />
               <Tab label="Pending" value="PENDING_RP_APPROVAL" count={counts.pending} />
+              <Tab label="Accepted" value="ACCEPTED" count={counts.accepted} />
               <Tab label="Submitted" value="SUBMITTED_TO_PROVIDER" count={counts.submitted} />
-              <Tab label="Approved" value="APPROVED" count={counts.approved} />
+              <Tab label="Confirmed" value="APPROVED" count={counts.confirmed} />
               <Tab label="Rejected" value="REJECTED" count={counts.rejected} />
               <Tab label="Feedback" value="FEEDBACK" count={counts.withFeedback} />
             </div>
@@ -430,8 +544,8 @@ export default function OrdersList() {
                     <option value="ALL">All</option>
                     <option value="PENDING_RP_APPROVAL">Pending RP Approval</option>
                     <option value="SUBMITTED_TO_PROVIDER">Submitted to Provider</option>
-                    <option value="APPROVED">Provider Approved</option>
-                    <option value="REJECTED">Provider Rejected</option>
+                    <option value="APPROVED">Provider Confirmed</option>
+                    <option value="REJECTED">Rejected</option>
                   </select>
                 </div>
               </div>
@@ -483,97 +597,89 @@ export default function OrdersList() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 bg-white/60">
-                    {filteredOrders
-                      .filter((o) => {
-                        // NEW: Feedback tab (only affects view, no logic change)
-                        if (activeTab !== "FEEDBACK") return true;
-                        return o.rating != null;
-                      })
-                      .map((o) => {
-                        const st = effectiveStatus(o);
-                        return (
-                          <tr
-                            key={o.id}
-                            className="hover:bg-slate-50/80 transition cursor-pointer"
-                            onClick={() => navigate(`/orders/${o.id}`)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") navigate(`/orders/${o.id}`);
-                            }}
+                    {filteredOrders.map((o) => (
+                      <tr
+                        key={o.id}
+                        className="hover:bg-slate-50/80 transition cursor-pointer"
+                        onClick={() => navigate(`/orders/${o.id}`)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") navigate(`/orders/${o.id}`);
+                        }}
+                      >
+                        <td className="py-3 px-4 font-semibold text-slate-900">
+                          #{o.id}
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <span
+                            className={
+                              "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold " +
+                              badgeClass(o)
+                            }
+                            title={statusLabel(o)}
                           >
-                            <td className="py-3 px-4 font-semibold text-slate-900">
-                              #{o.id}
-                            </td>
+                            {statusIcon(o)}
+                            {statusLabel(o)}
+                          </span>
+                        </td>
 
-                            <td className="py-3 px-4">
-                              <span
-                                className={
-                                  "inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold " +
-                                  badgeClass(st)
-                                }
-                              >
-                                {statusIcon(st)}
-                                {statusLabel(st)}
-                              </span>
-                            </td>
+                        <td className="py-3 px-4">
+                          <div className="text-xs text-slate-800">
+                            {o.requestNumber || "-"}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            ID: {o.requestId ?? "-"}
+                          </div>
+                        </td>
 
-                            <td className="py-3 px-4">
-                              <div className="text-xs text-slate-800">
-                                {o.requestNumber || "-"}
-                              </div>
-                              <div className="text-[11px] text-slate-500">
-                                ID: {o.requestId ?? "-"}
-                              </div>
-                            </td>
+                        <td className="py-3 px-4 text-slate-800">
+                          {o.title || "-"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-800">
+                          {o.supplierName || "-"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-800">
+                          {o.specialistName || "-"}
+                        </td>
 
-                            <td className="py-3 px-4 text-slate-800">
-                              {o.title || "-"}
-                            </td>
-                            <td className="py-3 px-4 text-slate-800">
-                              {o.supplierName || "-"}
-                            </td>
-                            <td className="py-3 px-4 text-slate-800">
-                              {o.specialistName || "-"}
-                            </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-slate-900">
+                            {fmtMoney(o.contractValue)}
+                          </span>
+                        </td>
 
-                            <td className="py-3 px-4">
-                              <span className="font-semibold text-slate-900">
-                                {fmtMoney(o.contractValue)}
-                              </span>
-                            </td>
+                        <td className="py-3 px-4 text-xs text-slate-600">
+                          {fmtDateTime(o.createdAt)}
+                        </td>
 
-                            <td className="py-3 px-4 text-xs text-slate-600">
-                              {fmtDateTime(o.createdAt)}
-                            </td>
+                        <td className="py-3 px-4">
+                          {o.rating != null ? (
+                            <span className="text-emerald-700 font-semibold">
+                              ⭐ {o.rating}/5
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-xs">
+                              {role === "PROJECT_MANAGER" ? "Not yet" : "-"}
+                            </span>
+                          )}
+                        </td>
 
-                            <td className="py-3 px-4">
-                              {o.rating != null ? (
-                                <span className="text-emerald-700 font-semibold">
-                                  ⭐ {o.rating}/5
-                                </span>
-                              ) : (
-                                <span className="text-slate-500 text-xs">
-                                  {role === "PROJECT_MANAGER" ? "Not yet" : "-"}
-                                </span>
-                              )}
-                            </td>
-
-                            <td
-                              className="py-3 px-4 text-right"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={() => navigate(`/orders/${o.id}`)}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
-                                type="button"
-                              >
-                                Open <FiChevronRight />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                        <td
+                          className="py-3 px-4 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => navigate(`/orders/${o.id}`)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                            type="button"
+                          >
+                            Open <FiChevronRight />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

@@ -390,6 +390,9 @@ export default function RequestDetails() {
       request?.status === "BIDDING" ||
       request?.status === "EVALUATION");
 
+  // ✅ NEW: disable Set Preferred only when request is ORDERED
+  const isOrdered = request?.status === "ORDERED";
+
   // ------------------- states -------------------
   if (loading) {
     return (
@@ -722,12 +725,24 @@ export default function RequestDetails() {
                   <table className="min-w-[900px] w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
-                        <th className="text-left px-3 py-2 font-semibold">Domain</th>
-                        <th className="text-left px-3 py-2 font-semibold">Role</th>
-                        <th className="text-left px-3 py-2 font-semibold">Technology</th>
-                        <th className="text-left px-3 py-2 font-semibold">Experience</th>
-                        <th className="text-right px-3 py-2 font-semibold">Man-days</th>
-                        <th className="text-right px-3 py-2 font-semibold">Onsite</th>
+                        <th className="text-left px-3 py-2 font-semibold">
+                          Domain
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold">
+                          Role
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold">
+                          Technology
+                        </th>
+                        <th className="text-left px-3 py-2 font-semibold">
+                          Experience
+                        </th>
+                        <th className="text-right px-3 py-2 font-semibold">
+                          Man-days
+                        </th>
+                        <th className="text-right px-3 py-2 font-semibold">
+                          Onsite
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -740,8 +755,12 @@ export default function RequestDetails() {
                           <td className="px-3 py-2">{r.roleName || "-"}</td>
                           <td className="px-3 py-2">{r.technology || "-"}</td>
                           <td className="px-3 py-2">{r.experienceLevel || "-"}</td>
-                          <td className="px-3 py-2 text-right">{r.manDays ?? "-"}</td>
-                          <td className="px-3 py-2 text-right">{r.onsiteDays ?? "-"}</td>
+                          <td className="px-3 py-2 text-right">
+                            {r.manDays ?? "-"}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {r.onsiteDays ?? "-"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -841,9 +860,7 @@ export default function RequestDetails() {
                             ? "bg-white text-slate-900 ring-white/40"
                             : "bg-white/20 text-white ring-white/25 hover:bg-white/30"
                         }`}
-                        title={
-                          evaluations.length === 0 ? "Compute evaluation first" : ""
-                        }
+                        title={evaluations.length === 0 ? "Compute evaluation first" : ""}
                       >
                         Evaluation
                       </button>
@@ -996,8 +1013,7 @@ export default function RequestDetails() {
                                         : "bg-red-100 text-red-700"
                                     }`}
                                   >
-                                    Must-have:{" "}
-                                    {o.matchMustHaveCriteria ? "Match" : "No"}
+                                    Must-have: {o.matchMustHaveCriteria ? "Match" : "No"}
                                   </span>
 
                                   <span
@@ -1007,8 +1023,7 @@ export default function RequestDetails() {
                                         : "bg-gray-100 text-gray-700"
                                     }`}
                                   >
-                                    Nice-to-have:{" "}
-                                    {o.matchNiceToHaveCriteria ? "Match" : "No"}
+                                    Nice-to-have: {o.matchNiceToHaveCriteria ? "Match" : "No"}
                                   </span>
 
                                   <span
@@ -1028,8 +1043,14 @@ export default function RequestDetails() {
                                 <div className="flex items-center gap-2 justify-end">
                                   <button
                                     onClick={() => selectPreferred(o.id)}
-                                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow ring-1 ring-white/20"
+                                    disabled={isOrdered}
+                                    className={`px-4 py-2 rounded-lg text-xs font-semibold shadow ring-1 ring-white/20 transition ${
+                                      isOrdered
+                                        ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                        : "bg-blue-600 text-white hover:bg-blue-700"
+                                    }`}
                                     type="button"
+                                    title={isOrdered ? "Request is already ORDERED." : ""}
                                   >
                                     Set Preferred
                                   </button>
@@ -1124,15 +1145,9 @@ export default function RequestDetails() {
                               <td className="px-3 py-2 text-right">{e.dailyRate}</td>
                               <td className="px-3 py-2 text-right">{e.travellingCost}</td>
                               <td className="px-3 py-2 text-right font-semibold">{e.totalCost}</td>
-                              <td className="px-3 py-2 text-center">
-                                {e.matchMustHaveCriteria ? "✅" : "❌"}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {e.matchLanguageSkills ? "✅" : "❌"}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                {e.matchNiceToHaveCriteria ? "✅" : "❌"}
-                              </td>
+                              <td className="px-3 py-2 text-center">{e.matchMustHaveCriteria ? "✅" : "❌"}</td>
+                              <td className="px-3 py-2 text-center">{e.matchLanguageSkills ? "✅" : "❌"}</td>
+                              <td className="px-3 py-2 text-center">{e.matchNiceToHaveCriteria ? "✅" : "❌"}</td>
                               <td className="px-3 py-2 text-right">{e.techScore}</td>
                               <td className="px-3 py-2 text-right">{e.commercialScore}</td>
                               <td className="px-3 py-2 text-right font-bold">{e.finalScore}</td>

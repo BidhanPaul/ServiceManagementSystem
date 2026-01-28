@@ -22,7 +22,7 @@ public class ServiceOrderFeedback {
     private String comment;
 
     private Instant createdAt;
-    private String createdBy; // PM username
+    private String createdBy; // PM usernamea
 
     public ServiceOrderFeedback() {}
 

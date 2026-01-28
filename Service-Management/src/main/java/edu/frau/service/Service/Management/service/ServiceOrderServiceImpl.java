@@ -21,7 +21,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-    // ✅ NEW
+    // ✅ Group3 provider integration
     private final Group3IntegrationClient group3Client;
 
     public ServiceOrderServiceImpl(
@@ -62,8 +62,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         order.setPendingChangeRequestedBy(null);
         order.setPendingChangeRequestedAt(null);
 
-        // keep decision fields (decisionBy/decisionAt/rejectionReason) already stored
-        // keep pendingSubstitutionDate for history; if you want to clear it, uncomment:
+        // keep decision fields already stored
+        // keep pendingSubstitutionDate for history; uncomment if you want to clear:
         // order.setPendingSubstitutionDate(null);
     }
 
@@ -92,7 +92,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         dto.manDays = o.getManDays();
         dto.contractValue = o.getContractValue();
 
-        // ✅ pending substitution date (if you have this field in DTO)
         dto.pendingSubstitutionDate =
                 o.getPendingSubstitutionDate() == null ? null : o.getPendingSubstitutionDate().toString();
 
@@ -210,8 +209,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return toDTO(order);
     }
 
-    // ---------------- RP final approval ----------------
-
+    // ---------------- RP approval (submit to provider) ----------------
     @Override
     public OrderDetailsDTO approveOrder(Long orderId, String rpUsername) {
         User user = currentUser();
@@ -241,13 +239,18 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         Long providerOfferId = selected.getProviderOfferId();
 
-        // ✅ RP approves => tell provider ACCEPTED
-        // If this fails, do NOT change local status.
+        /**
+         * ✅ FIX (matches your lifecycle):
+         * RP Approve button = "submit to provider"
+         * => send decision SUBMITTED
+         *
+         * Provider later decides ACCEPTED / REJECTED (webhook / their UI)
+         */
         try {
             group3Client.sendDecision(providerOfferId, "ACCEPTED");
         } catch (Exception ex) {
             throw new IllegalStateException(
-                    "Failed to notify Group3 (provider system) about ACCEPTED decision for providerOfferId=" + providerOfferId,
+                    "Failed to notify Group3 about SUBMITTED decision for providerOfferId=" + providerOfferId,
                     ex
             );
         }
@@ -255,12 +258,13 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         // ✅ After successful provider notification:
         order.setStatus(OrderStatus.SUBMITTED_TO_PROVIDER);
 
-        // RP audit
+        // RP audit (kept)
         order.setApprovedAt(Instant.now());
         order.setApprovedBy(rpUsername);
 
         ServiceOrder saved = orderRepository.save(order);
 
+        // Keep your existing request updates/notification logic (unchanged)
         ServiceRequest req = saved.getServiceRequestReference();
         if (req != null) {
             req.setStatus(RequestStatus.ORDERED);
@@ -291,21 +295,16 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         if (order.getSelectedOffer() != null) {
             ServiceOffer selected = order.getSelectedOffer();
 
-            // ✅ IMPORTANT: provider needs providerOfferId (not local DB id)
             if (selected.getProviderOfferId() != null) {
                 Long providerOfferId = selected.getProviderOfferId();
                 try {
                     group3Client.sendDecision(providerOfferId, "REJECTED");
                 } catch (Exception ex) {
                     throw new IllegalStateException(
-                            "Failed to notify Group3 (provider system) about REJECTED decision for providerOfferId=" + providerOfferId,
+                            "Failed to notify Group3 about REJECTED decision for providerOfferId=" + providerOfferId,
                             ex
                     );
                 }
-            } else {
-                // Optional: if you want rejection to still succeed locally even if providerOfferId missing
-                // just leave this as a warning (log). If you prefer to hard-fail, throw instead.
-                // log.warn("Selected offer has no providerOfferId; skipping provider REJECTED notification.");
             }
         }
 
@@ -326,10 +325,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return toDTO(saved);
     }
 
-
-
     // ---------------- PM feedback ----------------
-
     @Override
     public OrderDetailsDTO submitFeedback(Long orderId, String pmUsername, OrderFeedbackRequest body) {
         User user = currentUser();

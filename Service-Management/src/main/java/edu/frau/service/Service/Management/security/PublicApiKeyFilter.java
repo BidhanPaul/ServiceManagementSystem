@@ -13,11 +13,13 @@ import java.io.IOException;
 @Component
 public class PublicApiKeyFilter extends OncePerRequestFilter {
 
+    // Header names
     private static final String HEADER_NAME_PUBLIC = "ServiceRequestbids3a";
     private static final String HEADER_NAME_GROUP3 = "GROUP3-API-KEY";
 
-    // shared secret stored in Render env var
-    private static final String ENV_KEY_NAME = "PUBLIC_BIDDING_API_KEY";
+    // ✅ Env var names (FIXED: separate keys for public vs Group3 webhook)
+    private static final String ENV_KEY_PUBLIC = "PUBLIC_BIDDING_API_KEY";
+    private static final String ENV_KEY_GROUP3 = "GROUP3_API_KEY";
 
     private boolean isOneOf(String path, String... allowed) {
         if (path == null) return false;
@@ -55,12 +57,16 @@ public class PublicApiKeyFilter extends OncePerRequestFilter {
                         || path.startsWith("/api/integrations/group3/offers"))
                         && (path.endsWith("/decision") || path.endsWith("/decision/"));
 
+        // Not protected by this filter
         if (!isPublicProtected && !isGroup3Webhook) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String expectedKey = System.getenv(ENV_KEY_NAME);
+        // ✅ Choose the correct expected key based on which flow it is
+        String expectedKey = System.getenv(isGroup3Webhook ? ENV_KEY_GROUP3 : ENV_KEY_PUBLIC);
+
+        // ✅ Choose the correct header based on which flow it is
         String providedKey = isGroup3Webhook
                 ? request.getHeader(HEADER_NAME_GROUP3)
                 : request.getHeader(HEADER_NAME_PUBLIC);
