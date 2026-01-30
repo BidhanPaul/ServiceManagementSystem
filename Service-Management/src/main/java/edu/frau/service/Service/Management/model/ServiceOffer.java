@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "service_offers")
 @JsonIgnoreProperties(value = { "hibernateLazyInitializer", "handler" })
@@ -40,6 +43,10 @@ public class ServiceOffer {
     // ✅ CRITICAL: provider system offer ID (Group3 / Group4)
     @Column(name = "provider_offer_id", unique = true)
     private Long providerOfferId;
+
+    // ✅ NEW: store provider payload specialists[] (TEAM / MULTI support)
+    @OneToMany(mappedBy = "serviceOffer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ServiceOfferSpecialist> specialists = new ArrayList<>();
 
     public ServiceOffer() {}
 
@@ -168,6 +175,41 @@ public class ServiceOffer {
         this.providerOfferId = providerOfferId;
     }
 
+    // ✅ NEW: Specialists list accessors
+    public List<ServiceOfferSpecialist> getSpecialists() {
+        return specialists;
+    }
+
+    /**
+     * Replace entire specialists list safely (keeps JPA orphanRemoval happy).
+     */
+    public void setSpecialists(List<ServiceOfferSpecialist> specialists) {
+        this.specialists.clear();
+        if (specialists != null) {
+            for (ServiceOfferSpecialist s : specialists) {
+                addSpecialist(s);
+            }
+        }
+    }
+
+    /**
+     * Add specialist and bind back-reference.
+     */
+    public void addSpecialist(ServiceOfferSpecialist specialist) {
+        if (specialist == null) return;
+        specialist.setServiceOffer(this);
+        this.specialists.add(specialist);
+    }
+
+    /**
+     * Remove specialist and clear back-reference.
+     */
+    public void removeSpecialist(ServiceOfferSpecialist specialist) {
+        if (specialist == null) return;
+        specialist.setServiceOffer(null);
+        this.specialists.remove(specialist);
+    }
+
     @Override
     public String toString() {
         return "ServiceOffer{" +
@@ -177,6 +219,7 @@ public class ServiceOffer {
                 ", supplierName='" + supplierName + '\'' +
                 ", supplierRepresentative='" + supplierRepresentative + '\'' +
                 ", totalCost=" + totalCost +
+                ", specialistsCount=" + (specialists == null ? 0 : specialists.size()) +
                 '}';
     }
 }

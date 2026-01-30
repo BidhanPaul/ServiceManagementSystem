@@ -680,7 +680,7 @@ public class RequestServiceImpl implements RequestService {
         // ✅ NEW: persist providerOfferId (this was missing, causing provider_offer_id = NULL)
         offer.setProviderOfferId(incoming.getProviderOfferId());
 
-        // copy only allowed fields
+        // copy only allowed fields (legacy/backward compatible)
         offer.setSpecialistName(incoming.getSpecialistName());
         offer.setMaterialNumber(incoming.getMaterialNumber());
 
@@ -697,6 +697,29 @@ public class RequestServiceImpl implements RequestService {
 
         offer.setSupplierName(incoming.getSupplierName());
         offer.setSupplierRepresentative(incoming.getSupplierRepresentative());
+
+// ✅ NEW: copy specialists[] (provider payload support)
+        if (incoming.getSpecialists() != null && !incoming.getSpecialists().isEmpty()) {
+            for (var s : incoming.getSpecialists()) {
+                if (s == null) continue;
+
+                ServiceOfferSpecialist child = new ServiceOfferSpecialist();
+                child.setUserId(s.getUserId());
+                child.setName(s.getName());
+                child.setMaterialNumber(s.getMaterialNumber());
+
+                child.setDailyRate(s.getDailyRate());
+                child.setTravellingCost(s.getTravellingCost());
+                child.setSpecialistCost(s.getSpecialistCost());
+
+                child.setMatchMustHaveCriteria(s.getMatchMustHaveCriteria());
+                child.setMatchNiceToHaveCriteria(s.getMatchNiceToHaveCriteria());
+                child.setMatchLanguageSkills(s.getMatchLanguageSkills());
+
+                offer.addSpecialist(child);
+            }
+        }
+
 
         ServiceOffer saved = offerRepository.save(offer);
 
