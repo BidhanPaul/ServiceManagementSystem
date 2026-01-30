@@ -26,6 +26,9 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 
     Optional<ServiceOrder> findBySelectedOffer_Id(Long offerId);
 
+    Optional<ServiceOrder> findByProviderOrderId(Long providerOrderId);
+
+
 
     @Modifying
     @Transactional

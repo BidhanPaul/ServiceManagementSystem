@@ -83,6 +83,11 @@ public class ServiceOrder {
     private Instant pendingChangeDecisionAt;
     private String pendingChangeDecisionBy;
 
+    // ✅ Group3 provider order id (returned as serviceOrder.id when offer decision is ACCEPTED)
+    @Column(name = "provider_order_id")
+    private Long providerOrderId;
+
+
     @Column(length = 2000)
     private String pendingChangeRejectionReason;
 
@@ -167,6 +172,10 @@ public class ServiceOrder {
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
     // ---------- PENDING CHANGE GETTERS & SETTERS ----------
+
+    public Long getProviderOrderId() { return providerOrderId; }
+    public void setProviderOrderId(Long providerOrderId) { this.providerOrderId = providerOrderId; }
+
 
     public OrderChangeType getPendingChangeType() { return pendingChangeType; }
     public void setPendingChangeType(OrderChangeType pendingChangeType) { this.pendingChangeType = pendingChangeType; }

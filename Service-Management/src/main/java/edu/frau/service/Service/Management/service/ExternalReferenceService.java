@@ -229,7 +229,7 @@ public class ExternalReferenceService {
                 .filter(c ->
                         contractIdOrRefOrMongoId.equals(String.valueOf(c.get("id"))) ||
                                 contractIdOrRefOrMongoId.equals(String.valueOf(c.get("_id"))) ||
-                                contractIdOrRefOrMongoId.equals(String.valueOf(c.get("referenceNumber")))
+                                contractIdOrRefOrMongoId.equals(String.valueOf(c.get("contractId")))
                 )
                 .findFirst()
                 .orElse(null);
@@ -244,7 +244,7 @@ public class ExternalReferenceService {
         String id = firstNonBlank(
                 asString(c.get("id")),
                 asString(c.get("_id")),
-                asString(c.get("referenceNumber"))
+                asString(c.get("contractId"))
         );
         out.put("id", id);
 
