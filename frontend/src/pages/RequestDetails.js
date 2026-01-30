@@ -32,6 +32,11 @@ export default function RequestDetails() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
+  // ✅ NEW: expand/collapse specialists list per offer
+  const [openSpecs, setOpenSpecs] = useState({});
+  const toggleSpecs = (offerId) =>
+    setOpenSpecs((p) => ({ ...p, [offerId]: !p[offerId] }));
+
   // ✅ FIX #1: define getRoleFromToken BEFORE using it (function declaration is hoisted)
   function getRoleFromToken() {
     try {
@@ -355,6 +360,25 @@ export default function RequestDetails() {
     const n = Number(v);
     if (!Number.isFinite(n)) return "-";
     return `${n.toFixed(2)} €`;
+  };
+
+  // ✅ NEW: support multi-specialist offers (provider payload)
+  const offerSpecialists = (offer) => {
+    const list = offer?.specialists;
+    return Array.isArray(list) ? list.filter(Boolean) : [];
+  };
+
+  const offerPrimaryTitle = (offer) => {
+    const specs = offerSpecialists(offer);
+    if (specs.length === 0) return offer?.specialistName || "Unnamed Specialist";
+    if (specs.length === 1) return specs[0]?.name || specs[0]?.userId || "Unnamed Specialist";
+    return `${specs.length} Specialists`;
+  };
+
+  const offerPrimaryMaterial = (offer) => {
+    const specs = offerSpecialists(offer);
+    if (specs.length === 1) return specs[0]?.materialNumber || offer?.materialNumber || "-";
+    return offer?.materialNumber || "-";
   };
 
   const roles = request?.roles || [];
@@ -943,7 +967,7 @@ export default function RequestDetails() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="text-lg font-semibold text-slate-900 break-words">
-                                    {o.specialistName || "Unnamed Specialist"}
+                                    {offerPrimaryTitle(o)}
                                   </p>
 
                                   {isPreferred(o.id) && (
@@ -988,7 +1012,7 @@ export default function RequestDetails() {
                                     <span className="text-slate-500 font-semibold">
                                       Material #:
                                     </span>{" "}
-                                    {o.materialNumber || "-"}
+                                    {offerPrimaryMaterial(o)}
                                   </p>
                                   <p>
                                     <span className="text-slate-500 font-semibold">
@@ -1036,6 +1060,67 @@ export default function RequestDetails() {
                                     Language: {o.matchLanguageSkills ? "OK" : "No"}
                                   </span>
                                 </div>
+
+                                {/* ✅ NEW: Specialists (multi) */}
+                                {offerSpecialists(o).length > 0 && (
+                                  <div className="mt-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSpecs(o.id)}
+                                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 ring-1 ring-black/5"
+                                    >
+                                      {openSpecs[o.id] ? "Hide Specialists" : "View Specialists"} (
+                                      {offerSpecialists(o).length})
+                                    </button>
+
+                                    {openSpecs[o.id] && (
+                                      <div className="mt-3 overflow-x-auto">
+                                        <table className="min-w-[900px] w-full text-xs border border-slate-200 rounded-xl overflow-hidden">
+                                          <thead className="bg-slate-50 text-slate-600">
+                                            <tr>
+                                              <th className="text-left px-3 py-2 font-semibold">User ID</th>
+                                              <th className="text-left px-3 py-2 font-semibold">Name</th>
+                                              <th className="text-left px-3 py-2 font-semibold">Material #</th>
+                                              <th className="text-right px-3 py-2 font-semibold">Daily €</th>
+                                              <th className="text-right px-3 py-2 font-semibold">Travel €</th>
+                                              <th className="text-right px-3 py-2 font-semibold">Specialist Cost</th>
+                                              <th className="text-center px-3 py-2 font-semibold">Must</th>
+                                              <th className="text-center px-3 py-2 font-semibold">Nice</th>
+                                              <th className="text-center px-3 py-2 font-semibold">Lang</th>
+                                            </tr>
+                                          </thead>
+
+                                          <tbody className="divide-y divide-slate-100">
+                                            {offerSpecialists(o).map((s, idx) => (
+                                              <tr
+                                                key={`${o.id}-sp-${idx}`}
+                                                className={idx % 2 ? "bg-white" : "bg-slate-50/40"}
+                                              >
+                                                <td className="px-3 py-2">{s.userId || "-"}</td>
+                                                <td className="px-3 py-2">{s.name || "-"}</td>
+                                                <td className="px-3 py-2">{s.materialNumber || "-"}</td>
+                                                <td className="px-3 py-2 text-right">{s.dailyRate ?? "-"}</td>
+                                                <td className="px-3 py-2 text-right">{s.travellingCost ?? "-"}</td>
+                                                <td className="px-3 py-2 text-right font-semibold">
+                                                  {s.specialistCost ?? "-"}
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                  {s.matchMustHaveCriteria ? "✅" : "❌"}
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                  {s.matchNiceToHaveCriteria ? "✅" : "❌"}
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                  {s.matchLanguageSkills ? "✅" : "❌"}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {/* PM action */}
