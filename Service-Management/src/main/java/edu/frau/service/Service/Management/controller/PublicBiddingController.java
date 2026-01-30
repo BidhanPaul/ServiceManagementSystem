@@ -6,6 +6,9 @@ import edu.frau.service.Service.Management.service.RequestService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/public")
 public class PublicBiddingController {
@@ -17,223 +20,212 @@ public class PublicBiddingController {
     }
 
     /**
-     * ✅ Existing endpoint (kept)
+     * ✅ ONE SIMPLE ENDPOINT FOR ALL PROVIDER BIDS
+     *
      * POST /api/public/bids
-     * Accepts: { requestId, offer: { id, ... } }
+     *
+     * Supports:
+     * - single request (serviceRequest)
+     * - multi request (serviceRequests[])
+     * - flat specialists (specialists[])
+     * - team allocations (allocations[])
+     *
+     * Always returns:
+     * - List<ServiceOffer> (size = 1 for single request)
      */
     @PostMapping("/bids")
-    public ResponseEntity<ServiceOffer> bid(@RequestBody PublicBidRequest body) {
+    public ResponseEntity<List<ServiceOffer>> bidFromProviderUnified(
+            @RequestBody ProviderBidPayload body) {
 
-        if (body == null || body.requestId == null || body.offer == null) {
+        if (body == null || body.id == null) {
             return ResponseEntity.badRequest().body(null);
         }
 
-        // provider must send their offer id as offer.id
-        if (body.offer.id == null) {
+        boolean hasSingle = body.serviceRequest != null && body.serviceRequest.id != null;
+        boolean hasMulti = body.serviceRequests != null && !body.serviceRequests.isEmpty();
+
+        // must be exactly one mode
+        if (hasSingle == hasMulti) {
             return ResponseEntity.badRequest().body(null);
         }
 
-        ServiceOffer offer = new ServiceOffer();
-        offer.setId(null); // force INSERT
-        offer.setProviderOfferId(body.offer.id);
-
-        offer.setSpecialistName(body.offer.specialistName);
-        offer.setMaterialNumber(body.offer.materialNumber);
-
-        offer.setDailyRate(body.offer.dailyRate != null ? body.offer.dailyRate : 0.0);
-        offer.setTravellingCost(body.offer.travellingCost != null ? body.offer.travellingCost : 0.0);
-        offer.setTotalCost(body.offer.totalCost != null ? body.offer.totalCost : 0.0);
-
-        offer.setContractualRelationship(body.offer.contractualRelationship);
-        offer.setSubcontractorCompany(body.offer.subcontractorCompany);
-
-        offer.setMatchMustHaveCriteria(Boolean.TRUE.equals(body.offer.matchMustHaveCriteria));
-        offer.setMatchNiceToHaveCriteria(Boolean.TRUE.equals(body.offer.matchNiceToHaveCriteria));
-        offer.setMatchLanguageSkills(Boolean.TRUE.equals(body.offer.matchLanguageSkills));
-
-        offer.setSupplierName(body.offer.supplierName);
-        offer.setSupplierRepresentative(body.offer.supplierRepresentative);
-
-        // ✅ specialists[] support (if you added it in ServiceOffer)
-        if (body.offer.specialists != null && !body.offer.specialists.isEmpty()) {
-            for (PublicSpecialistDTO s : body.offer.specialists) {
-                if (s == null) continue;
-
-                ServiceOfferSpecialist child = new ServiceOfferSpecialist();
-                child.setUserId(s.userId);
-                child.setName(s.name);
-                child.setMaterialNumber(s.materialNumber);
-
-                child.setDailyRate(s.dailyRate != null ? s.dailyRate : 0.0);
-                child.setTravellingCost(s.travellingCost != null ? s.travellingCost : 0.0);
-                child.setSpecialistCost(s.specialistCost != null ? s.specialistCost : 0.0);
-
-                child.setMatchMustHaveCriteria(Boolean.TRUE.equals(s.matchMustHaveCriteria));
-                child.setMatchNiceToHaveCriteria(Boolean.TRUE.equals(s.matchNiceToHaveCriteria));
-                child.setMatchLanguageSkills(Boolean.TRUE.equals(s.matchLanguageSkills));
-
-                offer.addSpecialist(child); // requires offer.addSpecialist(...)
+        // collect request ids
+        List<Long> requestIds = new ArrayList<>();
+        if (hasSingle) {
+            requestIds.add(body.serviceRequest.id);
+        } else {
+            for (ProviderServiceRequest sr : body.serviceRequests) {
+                if (sr == null || sr.id == null) {
+                    return ResponseEntity.badRequest().body(null);
+                }
+                requestIds.add(sr.id);
             }
         }
 
-        ServiceOffer created = requestService.addOffer(body.requestId, offer);
-        return ResponseEntity.ok(created);
+        List<ServiceOffer> createdOffers = new ArrayList<>();
+
+        for (Long requestId : requestIds) {
+
+            ServiceOffer offer = buildBaseOffer(body);
+
+            // prefer allocations (team), fallback to specialists
+            if (body.allocations != null && !body.allocations.isEmpty()) {
+                applyAllocations(offer, body.allocations, requestId);
+            } else {
+                applySpecialists(offer, body.specialists);
+            }
+
+            ServiceOffer created = requestService.addOffer(requestId, offer);
+            createdOffers.add(created);
+        }
+
+        return ResponseEntity.ok(createdOffers);
     }
 
-    /**
-     * ✅ NEW endpoint: accepts EXACT provider payload
-     * POST /api/public/provider-bids
-     *
-     * Accepts:
-     * {
-     *   "id": 3,
-     *   "serviceRequest": { "id": 39, ... },
-     *   "specialists": [ ... ],
-     *   "totalCost": 87300,
-     *   ...
-     * }
-     */
-    @PostMapping("/provider-bids")
-    public ResponseEntity<ServiceOffer> providerBid(@RequestBody ProviderBidPayload body) {
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
 
-        if (body == null) return ResponseEntity.badRequest().body(null);
-
-        // ✅ requestId comes from serviceRequest.id
-        if (body.serviceRequest == null || body.serviceRequest.id == null) {
-            return ResponseEntity.badRequest().body(null);
-        }
-
-        // ✅ provider offer id comes from root "id"
-        if (body.id == null) {
-            return ResponseEntity.badRequest().body(null);
-        }
-
-        Long requestId = body.serviceRequest.id;
-
+    private ServiceOffer buildBaseOffer(ProviderBidPayload body) {
         ServiceOffer offer = new ServiceOffer();
-        offer.setId(null); // force INSERT
-        offer.setProviderOfferId(body.id); // ✅ map root id -> providerOfferId
-
-        // for multi/team: keep a label in specialistName/materialNumber if you want
-        offer.setSpecialistName("MULTI_SPECIALISTS"); // or first specialist name if SINGLE
-        offer.setMaterialNumber("MULTI");
-
-        offer.setTotalCost(body.totalCost != null ? body.totalCost : 0.0);
-
-        offer.setContractualRelationship(body.contractualRelationship);
-        offer.setSubcontractorCompany(body.subcontractorCompany);
+        offer.setId(null); // always INSERT
+        offer.setProviderOfferId(body.id);
 
         offer.setSupplierName(body.supplierName);
         offer.setSupplierRepresentative(body.supplierRepresentative);
 
-        // ✅ optional: if provider sends offerStatus/providerId/providerName, you can store them
-        // (only if you added fields in ServiceOffer. If not, ignore)
+        offer.setContractualRelationship(body.contractualRelationship);
+        offer.setSubcontractorCompany(body.subcontractorCompany);
 
-        // ✅ specialists[]
-        if (body.specialists != null && !body.specialists.isEmpty()) {
-            for (ProviderSpecialistDTO s : body.specialists) {
-                if (s == null) continue;
+        offer.setTotalCost(body.totalCost != null ? body.totalCost : 0.0);
+        return offer;
+    }
+
+    private void applySpecialists(ServiceOffer offer, List<ProviderSpecialist> specialists) {
+
+        if (specialists == null || specialists.isEmpty()) {
+            offer.setMatchMustHaveCriteria(false);
+            offer.setMatchNiceToHaveCriteria(false);
+            offer.setMatchLanguageSkills(false);
+            return;
+        }
+
+        ProviderSpecialist first = specialists.get(0);
+        offer.setSpecialistName(first.name);
+        offer.setMaterialNumber(first.materialNumber);
+        offer.setDailyRate(first.dailyRate != null ? first.dailyRate : 0.0);
+        offer.setTravellingCost(first.travellingCost != null ? first.travellingCost : 0.0);
+
+        boolean must = true, nice = true, lang = true;
+
+        for (ProviderSpecialist s : specialists) {
+            ServiceOfferSpecialist child = new ServiceOfferSpecialist();
+            child.setUserId(s.userId);
+            child.setName(s.name);
+            child.setMaterialNumber(s.materialNumber);
+            child.setDailyRate(s.dailyRate);
+            child.setTravellingCost(s.travellingCost);
+            child.setSpecialistCost(s.specialistCost);
+
+            child.setMatchMustHaveCriteria(Boolean.TRUE.equals(s.matchMustHaveCriteria));
+            child.setMatchNiceToHaveCriteria(Boolean.TRUE.equals(s.matchNiceToHaveCriteria));
+            child.setMatchLanguageSkills(Boolean.TRUE.equals(s.matchLanguageSkills));
+
+            must &= Boolean.TRUE.equals(s.matchMustHaveCriteria);
+            nice &= Boolean.TRUE.equals(s.matchNiceToHaveCriteria);
+            lang &= Boolean.TRUE.equals(s.matchLanguageSkills);
+
+            offer.addSpecialist(child);
+        }
+
+        offer.setMatchMustHaveCriteria(must);
+        offer.setMatchNiceToHaveCriteria(nice);
+        offer.setMatchLanguageSkills(lang);
+    }
+
+    private void applyAllocations(ServiceOffer offer,
+                                  List<RoleAllocation> allocations,
+                                  Long requestId) {
+
+        boolean must = true, nice = true, lang = true;
+        boolean legacySet = false;
+
+        for (RoleAllocation a : allocations) {
+
+            // filter by request in multi mode
+            if (a.serviceRequest != null && a.serviceRequest.id != null &&
+                    !requestId.equals(a.serviceRequest.id)) {
+                continue;
+            }
+
+            if (a.members == null) continue;
+
+            for (SpecialistAllocation s : a.members) {
+
+                if (!legacySet) {
+                    offer.setSpecialistName(s.name);
+                    offer.setMaterialNumber(s.materialNumber);
+                    offer.setDailyRate(s.dailyRate != null ? s.dailyRate : 0.0);
+                    offer.setTravellingCost(s.travellingCost != null ? s.travellingCost : 0.0);
+                    legacySet = true;
+                }
 
                 ServiceOfferSpecialist child = new ServiceOfferSpecialist();
                 child.setUserId(s.userId);
                 child.setName(s.name);
                 child.setMaterialNumber(s.materialNumber);
-
-                child.setDailyRate(s.dailyRate != null ? s.dailyRate : 0.0);
-                child.setTravellingCost(s.travellingCost != null ? s.travellingCost : 0.0);
-                child.setSpecialistCost(s.specialistCost != null ? s.specialistCost : 0.0);
+                child.setDailyRate(s.dailyRate);
+                child.setTravellingCost(s.travellingCost);
+                child.setSpecialistCost(s.specialistCost);
 
                 child.setMatchMustHaveCriteria(Boolean.TRUE.equals(s.matchMustHaveCriteria));
                 child.setMatchNiceToHaveCriteria(Boolean.TRUE.equals(s.matchNiceToHaveCriteria));
                 child.setMatchLanguageSkills(Boolean.TRUE.equals(s.matchLanguageSkills));
 
-                offer.addSpecialist(child);
-            }
+                must &= Boolean.TRUE.equals(s.matchMustHaveCriteria);
+                nice &= Boolean.TRUE.equals(s.matchNiceToHaveCriteria);
+                lang &= Boolean.TRUE.equals(s.matchLanguageSkills);
 
-            // ✅ if SINGLE, you may want the card title to be first specialist name
-            if (body.specialists.size() == 1 && body.specialists.get(0) != null) {
-                offer.setSpecialistName(body.specialists.get(0).name);
-                offer.setMaterialNumber(body.specialists.get(0).materialNumber);
-                offer.setDailyRate(body.specialists.get(0).dailyRate != null ? body.specialists.get(0).dailyRate : 0.0);
-                offer.setTravellingCost(body.specialists.get(0).travellingCost != null ? body.specialists.get(0).travellingCost : 0.0);
+                offer.addSpecialist(child);
             }
         }
 
-        // ✅ matching flags at offer-level (optional default)
-        offer.setMatchMustHaveCriteria(true);
-        offer.setMatchNiceToHaveCriteria(true);
-        offer.setMatchLanguageSkills(true);
-
-        ServiceOffer created = requestService.addOffer(requestId, offer);
-        return ResponseEntity.ok(created);
+        offer.setMatchMustHaveCriteria(must);
+        offer.setMatchNiceToHaveCriteria(nice);
+        offer.setMatchLanguageSkills(lang);
     }
 
-    // ---------------- DTOs ----------------
+    // ---------------------------------------------------------------------
+    // DTOs
+    // ---------------------------------------------------------------------
 
-    public static class PublicBidRequest {
-        public Long requestId;
-        public PublicOfferDTO offer;
-    }
-
-    public static class PublicOfferDTO {
-        public Long id; // provider offer id
-        public String specialistName;
-        public String materialNumber;
-
-        public Double dailyRate;
-        public Double travellingCost;
-        public Double totalCost;
-
-        public String contractualRelationship;
-        public String subcontractorCompany;
-
-        public Boolean matchMustHaveCriteria;
-        public Boolean matchNiceToHaveCriteria;
-        public Boolean matchLanguageSkills;
-
-        public String supplierName;
-        public String supplierRepresentative;
-
-        // ✅ NEW: support specialists array
-        public java.util.List<PublicSpecialistDTO> specialists;
-    }
-
-    public static class PublicSpecialistDTO {
-        public String userId;
-        public String name;
-        public String materialNumber;
-        public Double dailyRate;
-        public Double travellingCost;
-        public Double specialistCost;
-        public Boolean matchMustHaveCriteria;
-        public Boolean matchNiceToHaveCriteria;
-        public Boolean matchLanguageSkills;
-    }
-
-    // ✅ Provider exact payload DTO
     public static class ProviderBidPayload {
-        public Long id; // provider offer id at root
-        public ProviderServiceRequestRef serviceRequest;
-        public java.util.List<ProviderSpecialistDTO> specialists;
+        public Long id;
+
+        public ProviderServiceRequest serviceRequest;
+        public List<ProviderServiceRequest> serviceRequests;
+
+        public List<ProviderSpecialist> specialists;
+        public List<RoleAllocation> allocations;
 
         public Double totalCost;
         public String contractualRelationship;
         public String subcontractorCompany;
-
         public String supplierName;
         public String supplierRepresentative;
-
         public String offerStatus;
         public String providerId;
         public String providerName;
     }
 
-    public static class ProviderServiceRequestRef {
+    public static class ProviderServiceRequest {
         public Long id;
         public String requestNumber;
+        public String title;
+        public String type;
     }
 
-    public static class ProviderSpecialistDTO {
+    public static class ProviderSpecialist {
         public String userId;
         public String name;
         public String materialNumber;
@@ -243,5 +235,22 @@ public class PublicBiddingController {
         public Boolean matchMustHaveCriteria;
         public Boolean matchNiceToHaveCriteria;
         public Boolean matchLanguageSkills;
+    }
+
+    public static class RoleAllocation {
+        public ProviderServiceRequest serviceRequest;
+        public String domain;
+        public String roleName;
+        public String technology;
+        public String experienceLevel;
+        public Integer manDays;
+        public Integer onsiteDays;
+        public List<SpecialistAllocation> members;
+        public Double roleTotalCost;
+    }
+
+    public static class SpecialistAllocation extends ProviderSpecialist {
+        public Integer manDaysAssigned;
+        public Integer onsiteDaysAssigned;
     }
 }
