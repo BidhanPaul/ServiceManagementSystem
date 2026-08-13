@@ -26,3 +26,7 @@ jobs:
         run: ./mvnw test
       - name: Build Docker image
         run: docker build -t servicemanagementsystem:${{ github.sha }} .
+      - name: Show that secret is available (safely)
+        run: echo "DB_URL is set, length is ${#DB_URL}"
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
