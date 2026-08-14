@@ -32,8 +32,29 @@ jobs:
       - name: Run tests
         run: ./mvnw test
       - name: Build Docker image
-        run: docker build -t servicemanagementsystem:${{ github.sha }} .
-      - name: Show that secret is available (safely)
-        run: echo "DB_URL is set, length is ${#DB_URL}"
-        env:
-          DB_URL: ${{ secrets.DB_URL }}
+        run: docker build -t europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }} .
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west3-docker.pkg.dev --quiet
+
+      - name: Push Docker image
+        run: docker push europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: servicemanagementsystem-cluster
+          location: europe-west3
+
+      - name: Deploy to GKE
+        run: |
+          kubectl set image deployment/servicemanagementsystem-deployment servicemanagementsystem=europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }}
+          kubectl rollout status deployment/servicemanagementsystem-deployment
