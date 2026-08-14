@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: servicemanagementsystem-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: servicemanagementsystem
+  template:
+    metadata:
+      labels:
+        app: servicemanagementsystem
+    spec:
+      containers:
+        - name: servicemanagementsystem
+          image: europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_URL
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_PASSWORD
