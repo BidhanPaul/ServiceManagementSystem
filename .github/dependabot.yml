@@ -4,11 +4,26 @@ updates:
     directory: /Service-Management
     schedule:
       interval: weekly
+    groups:
+      maven-minor-and-patch:
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
