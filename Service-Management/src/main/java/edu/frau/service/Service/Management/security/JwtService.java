@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,15 +17,22 @@ public class JwtService {
     private static final long EXPIRATION = 1000L * 60 * 60; // 1 hour
     private final String secretKey;
 
-    public JwtService(@Value("${app.jwt.secret}") String secretKey) {
+    public JwtService(@Value("${app.jwt.secret:}") String secretKey) {
         if (secretKey == null || secretKey.isBlank()) {
-            throw new IllegalStateException("app.jwt.secret must be configured");
+            throw new IllegalStateException(
+                    "JWT_SECRET must be configured as a non-empty Render environment variable"
+            );
+        }
+        if (secretKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must contain at least 32 UTF-8 bytes for HS256"
+            );
         }
         this.secretKey = secretKey;
     }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     /** 🔥 Generate token with role included */

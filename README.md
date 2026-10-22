@@ -543,7 +543,10 @@ slash.
 Create the Blueprint from Render, then set the backend `DB_URL`, `DB_USER`,
 `DB_PASSWORD`, and `JWT_SECRET` values in Render's environment settings. Do
 not copy the frontend URL into the backend service or the backend URL into the
-frontend build variable. A backend deploy is not healthy until its public
+frontend build variable. Generate `JWT_SECRET` with
+`openssl rand -base64 48`; it must be at least 32 UTF-8 bytes. The variable
+name must be exactly `JWT_SECRET` (not `app.jwt.secret`). A backend deploy is
+not healthy until its public
 `/actuator/health` endpoint returns successfully.
 
 ## Operational checklist
