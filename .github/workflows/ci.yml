@@ -65,6 +65,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm lint helm/service-management
       - run: helm template service-management helm/service-management --set image.tag=${{ github.sha }} >/dev/null
