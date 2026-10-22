@@ -120,8 +120,6 @@ export default function OrderDetails() {
   const [changeRejectReason, setChangeRejectReason] = useState("");
 
   const currentUsername = localStorage.getItem("username") || "";
-  const myRole = localStorage.getItem("role") || "PROCUREMENT_OFFICER";
-
   // -------- helpers --------
   const errorMessage = (err, fallback = "Request failed.") => {
     const d = err?.response?.data;

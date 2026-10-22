@@ -1,5 +1,5 @@
 // src/components/ProcurementDashboard.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../layout/Sidebar";
 import TopNav from "./TopNav";
@@ -37,7 +37,6 @@ const ProcurementDashboard = () => {
   const [rejectTargetRequest, setRejectTargetRequest] = useState(null);
 
   const currentUsername = localStorage.getItem("username") || "";
-  const myRole = localStorage.getItem("role") || "PROCUREMENT_OFFICER";
 
   // ---------------- LOAD DATA ----------------
 
@@ -154,7 +153,7 @@ const ProcurementDashboard = () => {
     </span>
   );
 
-  const projectLabel = (req) => {
+  const projectLabel = useCallback((req) => {
     const id = req?.projectId;
     if (!id) return "-";
 
@@ -170,9 +169,9 @@ const ProcurementDashboard = () => {
       "";
 
     return name ? `${id} – ${name}` : String(id);
-  };
+  }, [projects]);
 
-  const contractLabel = (req) => {
+  const contractLabel = useCallback((req) => {
     const id = req?.contractId;
     if (!id) return "-";
 
@@ -183,7 +182,7 @@ const ProcurementDashboard = () => {
     if (supplier && domain) return `${supplier} – ${domain}`;
     if (supplier) return `${supplier} – ${id}`;
     return String(id);
-  };
+  }, [contracts]);
 
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "IN_REVIEW"),
@@ -216,7 +215,7 @@ const ProcurementDashboard = () => {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
-  }, [pendingRequests, searchQuery]); // projectLabel/contractLabel use state, but UI-only safe
+  }, [pendingRequests, searchQuery, projectLabel, contractLabel]);
 
   const filteredRequests = useMemo(() => {
     if (!searchQuery.trim()) return requests;
@@ -234,7 +233,7 @@ const ProcurementDashboard = () => {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
-  }, [requests, searchQuery]);
+  }, [requests, searchQuery, projectLabel, contractLabel]);
 
   // If user is on Pending tab but there are none, auto-switch to All tab
   useEffect(() => {

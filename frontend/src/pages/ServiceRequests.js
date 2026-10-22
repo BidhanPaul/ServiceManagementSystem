@@ -246,6 +246,8 @@ export default function ServiceRequests() {
     loadRequests();
     loadProjects();
     loadContracts();
+    // These loaders intentionally run once when the page mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✅ Restore form state after refresh (RUN ONCE)

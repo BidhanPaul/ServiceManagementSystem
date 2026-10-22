@@ -381,7 +381,7 @@ export default function RequestDetails() {
     return offer?.materialNumber || "-";
   };
 
-  const roles = request?.roles || [];
+  const roles = useMemo(() => request?.roles || [], [request?.roles]);
 
   const totalManDays = useMemo(
     () => roles.reduce((sum, r) => sum + (Number(r.manDays) || 0), 0),

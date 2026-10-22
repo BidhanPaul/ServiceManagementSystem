@@ -1,5 +1,5 @@
 // src/pages/AdminUsers.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../api/api";
 import { FiSearch, FiEdit, FiTrash2, FiUsers } from "react-icons/fi";
 import UserEditModal from "../components/UserEditModal";

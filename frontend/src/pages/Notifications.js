@@ -315,6 +315,7 @@ export default function Notifications() {
     if (!selectedThreadKey) return null;
     return (dmThreads || []).find((t) => t.key === selectedThreadKey) || null;
   }, [dmThreads, selectedThreadKey]);
+  const selectedThreadMessageCount = selectedThread?.messages?.length || 0;
 
   // ✅ Auto-scroll when thread changes OR when message count changes
   useEffect(() => {
@@ -323,7 +324,7 @@ export default function Notifications() {
     // eslint-disable-next-line
   }, [
     selectedThreadKey,
-    selectedThread ? selectedThread.messages.length : 0,
+    selectedThreadMessageCount,
   ]);
 
   // Determine recipient for inline send

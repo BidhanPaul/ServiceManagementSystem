@@ -58,8 +58,6 @@ const ServiceProviderDashboard = () => {
   const [notes, setNotes] = useState("");
 
   const currentUsername = localStorage.getItem("username") || "";
-  const myRole = localStorage.getItem("role") || "SERVICE_PROVIDER";
-
   // ---------- Helpers ----------
   const srLabel = (req) => {
     if (!req) return "-";
