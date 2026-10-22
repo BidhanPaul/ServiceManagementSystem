@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: service-management-backend
+    runtime: docker
+    dockerfilePath: ./Service-Management/Dockerfile
+    dockerContext: ./Service-Management
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: "8080"
+
+  - type: static_site
+    name: service-management-frontend
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_API_BASE_URL
+        sync: false

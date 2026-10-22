@@ -530,6 +530,20 @@ values in Git:
 | `GROUP3_API_KEY` | Provider integration authentication |
 | `GROUP4_API_KEY` | Order-change callback authentication |
 
+### Render deployment
+
+The repository includes a `render.yaml` Blueprint for the two deployable
+applications. The backend uses the `Service-Management` Docker context and
+checks `/actuator/health`; the frontend is deployed as a static site and must
+set `REACT_APP_API_BASE_URL` to the backend's public URL without a trailing
+slash.
+
+Create the Blueprint from Render, then set the backend `DB_URL`, `DB_USER`,
+`DB_PASSWORD`, and `JWT_SECRET` values in Render's environment settings. Do
+not copy the frontend URL into the backend service or the backend URL into the
+frontend build variable. A backend deploy is not healthy until its public
+`/actuator/health` endpoint returns successfully.
+
 ## Operational checklist
 
 Before a production release:
