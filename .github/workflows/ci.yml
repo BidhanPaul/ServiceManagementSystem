@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: Service-Management
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -37,7 +37,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -52,7 +52,7 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/build-push-action@v6
         with:
           context: Service-Management
@@ -64,7 +64,7 @@ jobs:
     name: Helm validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: azure/setup-helm@v4
       - run: helm lint helm/service-management
       - run: helm template service-management helm/service-management --set image.tag=${{ github.sha }} >/dev/null
