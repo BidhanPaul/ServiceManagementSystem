@@ -1,5 +1,7 @@
 # Service Management System
 
+[![CI](https://github.com/BidhanPaul/ServiceManagementSystem/actions/workflows/ci.yml/badge.svg)](https://github.com/BidhanPaul/ServiceManagementSystem/actions/workflows/ci.yml)
+
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=20232A)
