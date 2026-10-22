@@ -2,6 +2,7 @@ package edu.frau.service.Service.Management.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
@@ -12,13 +13,18 @@ import java.util.Map;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY =
-            "this_is_a_super_long_jwt_secret_key_change_me_1234567890";
-
     private static final long EXPIRATION = 1000L * 60 * 60; // 1 hour
+    private final String secretKey;
+
+    public JwtService(@Value("${app.jwt.secret}") String secretKey) {
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException("app.jwt.secret must be configured");
+        }
+        this.secretKey = secretKey;
+    }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /** 🔥 Generate token with role included */

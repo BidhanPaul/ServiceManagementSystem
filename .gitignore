@@ -1,0 +1,17 @@
+# Local environment and tooling
+.env
+.env.*
+!.env.example
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Local Kubernetes and Helm output
+helm/**/charts/
+helm/**/tmp/
+
+# IDE and OS files
+.idea/
+*.iml
+.DS_Store

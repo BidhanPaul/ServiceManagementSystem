@@ -33,3 +33,23 @@ spec:
                 secretKeyRef:
                   name: db-credentials
                   key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: service-management-secrets
+                  key: JWT_SECRET
+            - name: PUBLIC_BIDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: service-management-secrets
+                  key: PUBLIC_BIDDING_API_KEY
+            - name: GROUP3_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: service-management-secrets
+                  key: GROUP3_API_KEY
+            - name: GROUP4_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: service-management-secrets
+                  key: GROUP4_API_KEY

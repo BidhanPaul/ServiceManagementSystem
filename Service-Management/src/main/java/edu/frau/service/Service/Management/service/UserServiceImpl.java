@@ -35,15 +35,8 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByEmail(user.getEmail()))
             throw new RuntimeException("Email already registered");
 
-        // ✅ ONLY PM validation via external employee list by EMAIL
-        if (user.getRole() == Role.PROJECT_MANAGER) {
-            boolean ok = pmWhitelistService.isValidProjectManager(user.getEmail(), null, null);
-            if (!ok) {
-                throw new RuntimeException(
-                        "You are not authorized to register as PROJECT_MANAGER. Use a valid company PM email."
-                );
-            }
-        }
+        // Public registration must never grant a privileged role.
+        user.setRole(Role.SERVICE_PROVIDER);
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User saved = userRepository.save(user);

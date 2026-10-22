@@ -1,0 +1,10 @@
+**/target
+**/node_modules
+**/build
+.git
+.github
+.idea
+*.iml
+*.log
+.env*
+README.md

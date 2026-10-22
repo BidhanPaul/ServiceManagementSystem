@@ -15,7 +15,6 @@ import edu.frau.service.Service.Management.dto.OrderChangeRejectRequest;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "*")
 public class ServiceOrderController {
 
     private final ServiceOrderService orderService;

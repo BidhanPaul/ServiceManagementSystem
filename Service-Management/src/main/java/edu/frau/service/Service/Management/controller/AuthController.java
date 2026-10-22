@@ -1,6 +1,7 @@
 package edu.frau.service.Service.Management.controller;
 
 import edu.frau.service.Service.Management.model.User;
+import edu.frau.service.Service.Management.dto.UserResponseDTO;
 import edu.frau.service.Service.Management.security.JwtService;
 import edu.frau.service.Service.Management.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,8 +28,7 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody User user) {
         try {
             User saved = userService.register(user);
-            saved.setPassword(null);
-            return ResponseEntity.ok(saved);
+            return ResponseEntity.ok(UserResponseDTO.from(saved));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(400).body(ex.getMessage());
         }
@@ -39,12 +39,6 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
 
         // 1️⃣ Check if user exists first
-        User user = userService.findByUsername(request.getUsername());
-        if (user == null) {
-            return ResponseEntity.status(404).body("User not registered.");
-        }
-
-        // 2️⃣ Validate password via Spring Security
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
@@ -53,10 +47,15 @@ public class AuthController {
                     )
             );
         } catch (Exception ex) {
-            return ResponseEntity.status(401).body("Invalid password.");
+            return ResponseEntity.status(401).body("Invalid username or password.");
         }
 
-        // 3️⃣ Generate JWT including role
+        User user = userService.findByUsername(request.getUsername());
+        if (user == null) {
+            return ResponseEntity.status(401).body("Invalid username or password.");
+        }
+
+        // Generate JWT including role
         String token = jwtService.generateToken(
                 user.getUsername(),
                 user.getRole().name()

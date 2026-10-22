@@ -229,9 +229,9 @@ Incoming order change decisions from Group 4 are handled by `Group4OrderChangeDe
 
 ## Security
 
-Authentication uses **JWT tokens** issued at login. Tokens encode the user's username and role and are validated on every request by `JwtAuthFilter`.
+Authentication uses **JWT tokens** issued at login. Tokens encode the user's username and role and are validated on every request by `JwtAuthFilter`. The signing key is supplied through `JWT_SECRET`; it must never be committed to source control. Rotate it immediately if it has ever been exposed.
 
-Public write endpoints (offer submission, bidding, order changes) are additionally protected by a **Public API Key** checked by `PublicApiKeyFilter`. Callers must include the key in their request headers.
+Public write endpoints (offer submission, bidding, order changes) are additionally protected by a **Public API Key** checked by `PublicApiKeyFilter`. Group 3 and Group 4 callbacks use separate integration keys. Callers must include the appropriate key in their request headers.
 
 CORS is configured to allow:
 - `http://localhost:3000` (local development)
@@ -240,6 +240,18 @@ CORS is configured to allow:
 ---
 
 ## Getting Started
+
+## DevOps learning platform
+
+The repository includes a Helm chart under `helm/service-management`, secure
+container defaults, and GitHub Actions workflows for CI and explicit image
+releases. The CI workflow validates pull requests without cloud credentials.
+The release workflow is intentionally manual and expects GCP Workload Identity
+Federation variables; it does not deploy directly to a cluster.
+
+Follow [`docs/DEVOPS-LEARNING-ROADMAP.md`](docs/DEVOPS-LEARNING-ROADMAP.md) for
+the staged path from local development through GCP, Kubernetes, Helm, Argo CD,
+GitOps, security, observability, and production operations.
 
 ### Prerequisites
 - Java 17+
@@ -255,7 +267,8 @@ cd ServiceManagementSystem
 
 # Set required environment variables (see below)
 export GROUP3_API_KEY=your_key_here
-export PUBLIC_API_KEY=your_key_here
+export PUBLIC_BIDDING_API_KEY=your_key_here
+export JWT_SECRET="$(openssl rand -base64 48)"
 
 # Build and run
 ./mvnw spring-boot:run
@@ -273,9 +286,12 @@ The application starts on `http://localhost:8080`.
 | Variable | Description |
 |---|---|
 | `GROUP3_API_KEY` | API key for authenticating calls to the Group 3 provider management system |
-| `PUBLIC_API_KEY` | API key required for external parties submitting offers or order changes via public endpoints |
-| `JWT_SECRET` | Secret used to sign and verify JWT tokens |
+| `GROUP4_API_KEY` | API key for authenticating Group 4 order-change callbacks |
+| `PUBLIC_BIDDING_API_KEY` | API key required for external parties submitting offers, bids, or order changes via public endpoints |
+| `JWT_SECRET` | Random secret of at least 32 bytes used to sign and verify JWT tokens |
 | `DATABASE_URL` | JDBC URL for the production database |
+
+Public registration always creates a `SERVICE_PROVIDER` account. Privileged roles must be assigned by an administrator. In Kubernetes, create the `service-management-secrets` Secret with the four key values before deploying; do not add that Secret manifest with real values to Git.
 
 ---
 

@@ -55,13 +55,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
-                                "/h2-console/**",
                                 "/api-index",
                                 "/actuator/health",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs",
-                                "/v3/api-docs/**",
                                 "/error"
                         ).permitAll()
 
@@ -100,7 +95,7 @@ public class SecurityConfig {
 
                         // ✅ FIXED ORDER ENDPOINT (Spring 6 compatible)
                         // Controller: POST /api/requests/offers/{offerId}/order
-                        .requestMatchers(HttpMethod.POST, "/api/requests/offers/{offerId}/order")
+                        .requestMatchers(HttpMethod.POST, "/api/requests/offers/*/order")
                         .hasAnyRole("RESOURCE_PLANNER", "ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/resource-planner/**")
@@ -131,13 +126,18 @@ public class SecurityConfig {
                         // ✅ IMPORTANT: External must load dropdowns without JWT
                         .requestMatchers(HttpMethod.GET, "/api/external/**").permitAll()
 
-                        .requestMatchers(HttpMethod.POST, "/api/integrations/group3/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/integrations/group3/offers/*/decision").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/integrations/group4/orders/*/change/decision").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/public/provider/group4/order-changes/*/decision").permitAll()
+
+                        .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/projects/**", "/api/contracts/**").hasAnyRole("ADMIN", "PROJECT_MANAGER")
 
 
                         .anyRequest().authenticated()
                 )
 
-                .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+                .headers(headers -> headers.frameOptions(frame -> frame.deny()))
                 .addFilterBefore(publicApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

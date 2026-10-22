@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/pm-whitelist")
-@CrossOrigin(origins = "*")
 public class PmWhitelistController {
 
     private final PmWhitelistService service;

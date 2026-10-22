@@ -6,16 +6,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -64,40 +62,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            UserDetails userDetails;
+            try {
+                userDetails = userDetailsService.loadUserByUsername(username);
+            } catch (UsernameNotFoundException ex) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             if (jwtService.isTokenValid(token, userDetails.getUsername())) {
 
-                // ✅ Use role claim, and normalize safely
-                String roleClaim = null;
-                try {
-                    roleClaim = jwtService.extractRole(token);
-                } catch (Exception ignored) {}
-
-                if (roleClaim == null || roleClaim.trim().isEmpty()) {
-                    filterChain.doFilter(request, response);
-                    return;
-                }
-
-                // ✅ FIX: Normalize role claim so "Resource Planner" / "RESOURCE-PLANNER" works
-                String r = roleClaim.trim().toUpperCase()
-                        .replace('-', '_')
-                        .replace(' ', '_');
-
-                // ✅ Build authorities in BOTH forms to avoid mismatch
-                // If token says RESOURCE_PLANNER -> add RESOURCE_PLANNER and ROLE_RESOURCE_PLANNER
-                // If token says ROLE_RESOURCE_PLANNER -> add ROLE_RESOURCE_PLANNER and RESOURCE_PLANNER
-                List<SimpleGrantedAuthority> auths = new ArrayList<>();
-                if (r.startsWith("ROLE_")) {
-                    auths.add(new SimpleGrantedAuthority(r));
-                    auths.add(new SimpleGrantedAuthority(r.substring("ROLE_".length())));
-                } else {
-                    auths.add(new SimpleGrantedAuthority(r));
-                    auths.add(new SimpleGrantedAuthority("ROLE_" + r));
-                }
-
                 UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, auths);
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
 
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);

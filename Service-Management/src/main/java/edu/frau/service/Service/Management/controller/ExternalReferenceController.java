@@ -8,7 +8,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/external")
-@CrossOrigin(origins = "*")
 public class ExternalReferenceController {
 
     private final ExternalReferenceService externalReferenceService;

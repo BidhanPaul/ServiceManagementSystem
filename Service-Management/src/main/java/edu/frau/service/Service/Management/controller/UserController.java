@@ -1,6 +1,8 @@
 package edu.frau.service.Service.Management.controller;
 
 import edu.frau.service.Service.Management.model.User;
+import edu.frau.service.Service.Management.dto.UserResponseDTO;
+import edu.frau.service.Service.Management.dto.UserUpdateRequest;
 import edu.frau.service.Service.Management.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +12,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin("*")
 public class UserController {
 
     @Autowired
@@ -18,22 +19,29 @@ public class UserController {
 
     // Get all users (Admin use)
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userService.findAllUsers());
+    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
+        return ResponseEntity.ok(userService.findAllUsers().stream().map(UserResponseDTO::from).toList());
     }
 
     // Get single user by ID
     @GetMapping("/{id}")
     public ResponseEntity<?> getUserById(@PathVariable UUID id) {
         return userService.getById(id)
+                .map(UserResponseDTO::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     // Update user (Admin)
     @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable UUID id, @RequestBody User user) {
-        return ResponseEntity.ok(userService.updateUser(id, user));
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable UUID id, @RequestBody UserUpdateRequest request) {
+        User user = new User();
+        user.setUsername(request.username());
+        user.setEmail(request.email());
+        user.setDob(request.dob());
+        user.setPassword(request.password());
+        user.setRole(request.role());
+        return ResponseEntity.ok(UserResponseDTO.from(userService.updateUser(id, user)));
     }
 
 
@@ -53,6 +61,6 @@ public class UserController {
         User user = userService.findByUsername(username);
         return user == null
                 ? ResponseEntity.notFound().build()
-                : ResponseEntity.ok(user);
+                : ResponseEntity.ok(UserResponseDTO.from(user));
     }
 }

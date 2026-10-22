@@ -1,60 +1,70 @@
-name: CI Pipeline
+name: CI
+
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-test:
+  backend:
+    name: Backend tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: Service-Management
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('Service-Management/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
+          distribution: temurin
           java-version: "21"
-          distribution: "temurin"
-      - name: Make mvnw executable
-        run: chmod +x mvnw
-      - name: Build with Maven
-        run: ./mvnw clean install -DskipTests
-      - name: Run tests
-        run: ./mvnw test
-      - name: Build Docker image
-        run: docker build -t europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }} .
+          cache: maven
+      - run: chmod +x mvnw
+      - run: ./mvnw -B verify
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
+  frontend:
+    name: Frontend build and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test -- --watchAll=false --passWithNoTests
+      - run: npm run build
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker europe-west3-docker.pkg.dev --quiet
-
-      - name: Push Docker image
-        run: docker push europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }}
-
-      - name: Get GKE credentials
-        uses: google-github-actions/get-gke-credentials@v2
+  container:
+    name: Container validation
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/build-push-action@v6
         with:
-          cluster_name: servicemanagementsystem-cluster
-          location: europe-west3
+          context: Service-Management
+          file: Service-Management/Dockerfile
+          push: false
+          tags: service-management:${{ github.sha }}
 
-      - name: Deploy to GKE
-        run: |
-          kubectl set image deployment/servicemanagementsystem-deployment servicemanagementsystem=europe-west3-docker.pkg.dev/virtual-dynamo-505500-r2/servicemanagementsystem-repo/servicemanagementsystem:${{ github.sha }}
-          kubectl rollout status deployment/servicemanagementsystem-deployment
+  helm:
+    name: Helm validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint helm/service-management
+      - run: helm template service-management helm/service-management --set image.tag=${{ github.sha }} >/dev/null
